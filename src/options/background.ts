@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener(request => {
     chrome.tabs.query({ url: "*://music.youtube.com/*" }, tabs => {
       tabs.forEach(tab => {
         if (tab.id != null) {
-          chrome.tabs.sendMessage(tab.id, {action: "updateCSS", css: request.css}).catch(error => {
+          chrome.tabs.sendMessage(tab.id, { action: "updateCSS", css: request.css }).catch(error => {
             console.log(`[BetterLyrics] (Safe to ignore) Error sending message to tab ${tab.id}:`, error);
           });
         } else {

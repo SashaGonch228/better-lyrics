@@ -4,7 +4,7 @@ import * as Constants from "../../core/constants";
 import * as BetterLyrics from "../../index";
 import * as Utils from "../../core/utils";
 import { AppState } from "../../index";
-import type {PlayerDetails} from "../../index";
+import type { PlayerDetails } from "../../index";
 
 /**
  * Enables the lyrics tab and prevents it from being disabled by YouTube Music.

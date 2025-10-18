@@ -9,7 +9,7 @@ export let log = (...args: any[]) => {
       console.log(args);
     }
   });
-}
+};
 
 /**
  * Configures the logging function based on user settings.

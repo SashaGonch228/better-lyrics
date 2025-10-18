@@ -14,9 +14,9 @@ import * as LyricProviders from "./providers";
 import * as RequestSniffing from "./requestSniffer";
 import * as Storage from "../../core/storage";
 import { AppState } from "../../index";
-import type {PlayerDetails} from "../../index";
-import type {SegmentMap} from "./requestSniffer";
-import type {CubeyLyricSourceResult, LyricSourceResult, ProviderParameters, YTLyricSourceResult} from "./providers";
+import type { PlayerDetails } from "../../index";
+import type { SegmentMap } from "./requestSniffer";
+import type { CubeyLyricSourceResult, LyricSourceResult, ProviderParameters, YTLyricSourceResult } from "./providers";
 
 /** Current version of the lyrics cache format */
 const LYRIC_CACHE_VERSION = "1.2.0";
@@ -214,7 +214,6 @@ export async function createLyrics(detail: PlayerDetails, signal: AbortSignal): 
       Utils.log(err);
     }
   }
-
 
   if (!lyrics) {
     lyrics = {
