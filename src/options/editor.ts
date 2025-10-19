@@ -347,17 +347,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (selectedTheme) {
       fetch(chrome.runtime.getURL(`css/themes/${selectedTheme.path}`))
-          .then(response => response.text())
-          .then(css => {
-            const themeContent = `/* ${selectedTheme.name}, a theme for BetterLyrics by ${selectedTheme.author} ${selectedTheme.link && `(${selectedTheme.link})`} */\n\n${css}\n`;
-            editor.setState(createEditorState(themeContent));
+        .then(response => response.text())
+        .then(css => {
+          const themeContent = `/* ${selectedTheme.name}, a theme for BetterLyrics by ${selectedTheme.author} ${selectedTheme.link && `(${selectedTheme.link})`} */\n\n${css}\n`;
+          editor.setState(createEditorState(themeContent));
 
-            chrome.storage.sync.set({themeName: selectedTheme.name});
-            currentThemeName = selectedTheme.name;
-            isUserTyping = false;
-            saveToStorage(true);
-            showAlert(`Applied theme: ${selectedTheme.name}`);
-          });
+          chrome.storage.sync.set({ themeName: selectedTheme.name });
+          currentThemeName = selectedTheme.name;
+          isUserTyping = false;
+          saveToStorage(true);
+          showAlert(`Applied theme: ${selectedTheme.name}`);
+        });
     }
   });
 });
