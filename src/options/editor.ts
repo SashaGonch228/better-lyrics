@@ -1,5 +1,7 @@
 import { EditorState } from "@codemirror/state";
+import { basicSetup } from '@codemirror/basic-setup';
 import { openSearchPanel, highlightSelectionMatches } from "@codemirror/search";
+import {type Diagnostic, linter, lintGutter, lintKeymap} from "@codemirror/lint";
 import { indentWithTab, history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import {
   foldGutter,
@@ -23,12 +25,12 @@ import {
   keymap,
   EditorView,
   type EditorViewConfig,
-  ViewPlugin,
+  ViewPlugin, tooltips,
 } from "@codemirror/view";
 
 import { oneDark } from "@codemirror/theme-one-dark";
 
-import { css } from "@codemirror/lang-css";
+import { css, cssLanguage } from "@codemirror/lang-css";
 
 let saveTimeout: number;
 let editor: EditorView;
@@ -90,7 +92,86 @@ document.addEventListener("keydown", function (e) {
 
 document.getElementById("back-btn")?.addEventListener("click", openOptions);
 
-function createEditorState(initialContents: string, options = {}) {
+const CONFIG = {
+  rules: {
+    // https://github.com/stylelint/stylelint-config-recommended/blob/main/index.js
+    'annotation-no-unknown': true,
+    'at-rule-no-unknown': true,
+    'block-no-empty': true,
+    'color-no-invalid-hex': true,
+    'comment-no-empty': true,
+    'custom-property-no-missing-var-function': true,
+    'declaration-block-no-duplicate-custom-properties': true,
+    'declaration-block-no-duplicate-properties': [
+      true,
+      {
+        ignore: ['consecutive-duplicates-with-different-values'],
+      },
+    ],
+    'declaration-block-no-shorthand-property-overrides': true,
+    'font-family-no-duplicate-names': true,
+    'font-family-no-missing-generic-family-keyword': true,
+    'function-calc-no-unspaced-operator': true,
+    'function-linear-gradient-no-nonstandard-direction': true,
+    'function-no-unknown': true,
+    'keyframe-block-no-duplicate-selectors': true,
+    'keyframe-declaration-no-important': true,
+    'media-feature-name-no-unknown': true,
+    'named-grid-areas-no-invalid': true,
+    'no-descending-specificity': true,
+    'no-duplicate-at-import-rules': true,
+    'no-duplicate-selectors': true,
+    'no-empty-source': true,
+    'no-invalid-double-slash-comments': true,
+    'no-invalid-position-at-import-rule': true,
+    'no-irregular-whitespace': true,
+    'property-no-unknown': true,
+    'selector-pseudo-class-no-unknown': true,
+    'selector-pseudo-element-no-unknown': true,
+    'selector-type-no-unknown': [
+      true,
+      {
+        ignore: ['custom-elements'],
+      },
+    ],
+    'string-no-newline': true,
+    'unit-no-unknown': true,
+  }
+};
+
+const cssLinter =linter(async (view) => {
+  let diagnostics: Diagnostic[] = [];
+  const doc = view.state.doc.toString();
+
+  try {
+    // @ts-ignore
+    const result = await window.stylelint.lint({
+      code: doc,
+      config: {
+        ...CONFIG
+      },
+       // Suppress console output from stylelint
+    });
+
+    if (result.results && result.results.length > 0) {
+      result.results[0].warnings.forEach((warning:any) => {
+        console.log(warning);
+        diagnostics.push({
+          from: view.state.doc.line(warning.line).from + warning.column - 1,
+          to: view.state.doc.line(warning.endLine || warning.line).from + warning.column + (warning.endColumn ? warning.endColumn - warning.column : 0) - 1,
+          severity: warning.severity as "error" | "warning" | "info",
+          message: warning.text,
+        });
+      });
+    }
+  } catch (error) {
+    console.error("Stylelint error:", error);
+  }
+
+  return diagnostics;
+});
+
+function createEditorState(initialContents: string) {
   let extensions = [
     lineNumbers(),
     highlightActiveLineGutter(),
@@ -115,9 +196,12 @@ function createEditorState(initialContents: string, options = {}) {
       ...historyKeymap,
       ...foldKeymap,
       ...completionKeymap,
+      ...lintKeymap,
     ]),
     css(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    lintGutter(),
+    cssLinter,
+    tooltips(),
     oneDark,
     EditorView.updateListener.of(update => {
       let text = update.state.doc.toString();
