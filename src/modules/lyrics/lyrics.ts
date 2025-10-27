@@ -16,9 +16,9 @@ import * as Storage from "../../core/storage";
 import { AppState } from "../../index";
 import type { PlayerDetails } from "../../index";
 import type { SegmentMap } from "./requestSniffer";
-import type {LyricSourceResult, ProviderParameters} from "./providers/shared";
-import type {CubeyLyricSourceResult} from "./providers/cubey";
-import type {YTLyricSourceResult} from "./providers/yt";
+import type { LyricSourceResult, ProviderParameters } from "./providers/shared";
+import type { CubeyLyricSourceResult } from "./providers/cubey";
+import type { YTLyricSourceResult } from "./providers/yt";
 
 /** Current version of the lyrics cache format */
 const LYRIC_CACHE_VERSION = "1.2.0";
