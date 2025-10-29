@@ -19,6 +19,7 @@ import type { SegmentMap } from "./requestSniffer";
 import type { LyricSourceResult, ProviderParameters } from "./providers/shared";
 import type { CubeyLyricSourceResult } from "./providers/cubey";
 import type { YTLyricSourceResult } from "./providers/yt";
+import {BACKGROUND_LYRIC_CLASS} from "@constants";
 
 /** Current version of the lyrics cache format */
 const LYRIC_CACHE_VERSION = "1.2.0";
@@ -503,7 +504,7 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
       span.dataset.content = part.words;
       span.style.setProperty("--blyrics-duration", part.durationMs + "ms");
       if (part.isBackground) {
-        span.classList.add("blyrics-background-lyric");
+        span.classList.add(BACKGROUND_LYRIC_CLASS);
       }
       if (part.words.trim().length === 0) {
         span.style.display = "inline";
@@ -534,25 +535,42 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
     const breakChar = /([\s\u200B\u00AD\p{Dash_Punctuation}])/gu
 
     let wordGroupBuffer = [] as HTMLSpanElement[];
-    lyricElementsBuffer.forEach(part => {
-      wordGroupBuffer.push(part);
-      if (part.textContent.length > 0 && breakChar.test(part.textContent[part.textContent.length - 1])) {
+    let isCurrentBufferBg = false;
+
+    let pushWordGroupBuffer = () => {
+      if (wordGroupBuffer.length > 0) {
         let span = document.createElement("span");
         wordGroupBuffer.forEach(word => {
           span.appendChild(word);
-        })
+        });
+
+        if (wordGroupBuffer[0].classList.contains(BACKGROUND_LYRIC_CLASS)) {
+          span.classList.add(BACKGROUND_LYRIC_CLASS);
+        }
+
         lyricElement.appendChild(span);
         wordGroupBuffer = [];
+      }
+    }
+
+    lyricElementsBuffer.forEach(part => {
+      const isNonMatchingType = isCurrentBufferBg !== part.classList.contains(BACKGROUND_LYRIC_CLASS);
+      if (!isNonMatchingType) {
+        wordGroupBuffer.push(part);
+      }
+      if (part.textContent.length > 0 && breakChar.test(part.textContent[part.textContent.length - 1]) || isNonMatchingType) {
+        pushWordGroupBuffer()
+      }
+
+      if (isNonMatchingType) {
+        wordGroupBuffer.push(part);
+        isCurrentBufferBg = part.classList.contains(BACKGROUND_LYRIC_CLASS);
       }
     });
 
     //add remaining
-    let span = document.createElement("span");
-    wordGroupBuffer.forEach(word => {
-      span.appendChild(word);
-    })
-    lyricElement.appendChild(span);
-    wordGroupBuffer = [];
+    pushWordGroupBuffer()
+
 
 
     //Makes bg lyrics go to the next line

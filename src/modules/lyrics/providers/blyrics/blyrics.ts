@@ -5,14 +5,6 @@ import type {BackgroundSpanElement, TtmlRoot} from "@modules/lyrics/providers/bl
 import {parseTime} from "@modules/lyrics/providers/lrcUtils";
 
 
-
-/** Helper to safely convert a single item or an array into an array */
-const toArray = <T>(data: T | T[] | undefined): T[] => {
-    if (Array.isArray(data)) return data;
-    if (data) return [data];
-    return [];
-};
-
 export default async function bLyrics(providerParameters: ProviderParameters): Promise<void> {
     // Fetch from the primary API if cache is empty or invalid
     const url = new URL(Constants.LYRICS_API_URL);

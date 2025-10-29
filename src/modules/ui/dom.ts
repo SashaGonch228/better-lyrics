@@ -564,7 +564,7 @@ export function tickLyrics(
         targetScrollPos = elemBounds.y;
         selectedLyricHeight = elemBounds.height;
         availableScrollTime = nextTime - lyricScrollTime;
-        const timeDelta = lyricScrollTime - time;
+        // const timeDelta = lyricScrollTime - time;
         // if (animEngineState.selectedElementIndex !== index && timeDelta > 0.05 && index > 0) {
         //   Utils.log(`[BetterLyrics] Scrolling to new lyric was late, dt: ${timeDelta.toFixed(5)}s`);
         // }
@@ -590,7 +590,7 @@ export function tickLyrics(
       }
       if (
         currentTime + setUpAnimationEarlyTime >= time &&
-        (currentTime < nextTime || currentTime < time + lineData.duration)
+        (currentTime < nextTime || currentTime < time + lineData.duration + 0.05)
       ) {
         lineData.selected = true;
 
