@@ -19,7 +19,7 @@ import type { SegmentMap } from "./requestSniffer";
 import type { LyricSourceResult, ProviderParameters } from "./providers/shared";
 import type { CubeyLyricSourceResult } from "./providers/cubey";
 import type { YTLyricSourceResult } from "./providers/yt";
-import {BACKGROUND_LYRIC_CLASS} from "@constants";
+import { BACKGROUND_LYRIC_CLASS } from "@constants";
 
 /** Current version of the lyrics cache format */
 const LYRIC_CACHE_VERSION = "1.2.0";
@@ -471,7 +471,6 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
 
     let lyricElementsBuffer = [] as HTMLSpanElement[];
 
-
     item.parts.forEach(part => {
       let isRtl = testRtl(part.words);
       if (!isRtl && part.words.trim().length > 0) {
@@ -532,7 +531,7 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
     }
 
     // Take elements from the buffer and group them together to control where wrapping happens
-    const breakChar = /([\s\u200B\u00AD\p{Dash_Punctuation}])/gu
+    const breakChar = /([\s\u200B\u00AD\p{Dash_Punctuation}])/gu;
 
     let wordGroupBuffer = [] as HTMLSpanElement[];
     let isCurrentBufferBg = false;
@@ -551,15 +550,18 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
         lyricElement.appendChild(span);
         wordGroupBuffer = [];
       }
-    }
+    };
 
     lyricElementsBuffer.forEach(part => {
       const isNonMatchingType = isCurrentBufferBg !== part.classList.contains(BACKGROUND_LYRIC_CLASS);
       if (!isNonMatchingType) {
         wordGroupBuffer.push(part);
       }
-      if (part.textContent.length > 0 && breakChar.test(part.textContent[part.textContent.length - 1]) || isNonMatchingType) {
-        pushWordGroupBuffer()
+      if (
+        (part.textContent.length > 0 && breakChar.test(part.textContent[part.textContent.length - 1])) ||
+        isNonMatchingType
+      ) {
+        pushWordGroupBuffer();
       }
 
       if (isNonMatchingType) {
@@ -569,9 +571,7 @@ function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false
     });
 
     //add remaining
-    pushWordGroupBuffer()
-
-
+    pushWordGroupBuffer();
 
     //Makes bg lyrics go to the next line
     let breakElm: HTMLSpanElement = document.createElement("span");
