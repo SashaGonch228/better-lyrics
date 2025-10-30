@@ -90,7 +90,9 @@ yt-formatted-string.text.style-scope.ytmusic-message-renderer {
 yt-formatted-string.non-expandable.description.style-scope.ytmusic-description-shelf-renderer:not(.blyrics--fallback) {
   display: none !important;
 }
-
+#contents > ytmusic-description-shelf-renderer > div > yt-formatted-string.footer.style-scope.ytmusic-description-shelf-renderer {
+  display: none !important;
+}
 yt-formatted-string.non-expandable.description.style-scope.ytmusic-description-shelf-renderer.blyrics--fallback {
   margin-block: 4rem !important;
 }
