@@ -1,41 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans+Armenian:wght@100..900&family=Noto+Sans+Bengali:wght@100..900&family=Noto+Sans+Devanagari:wght@100..900&family=Noto+Sans+Georgian:wght@100..900&family=Noto+Sans+Gujarati:wght@100..900&family=Noto+Sans+HK:wght@100..900&family=Noto+Sans+Hebrew:wght@100..900&family=Noto+Sans+JP:wght@100..900&family=Noto+Sans+KR:wght@100..900&family=Noto+Sans+Kannada:wght@100..900&family=Noto+Sans+Khmer:wght@100..900&family=Noto+Sans+Lao+Looped:wght@100..900&family=Noto+Sans+Lao:wght@100..900&family=Noto+Sans+Malayalam:wght@100..900&family=Noto+Sans+Marchen&family=Noto+Sans+Meetei+Mayek:wght@100..900&family=Noto+Sans+Multani&family=Noto+Sans+NKo&family=Noto+Sans+Old+Permic&family=Noto+Sans+SC:wght@100..900&family=Noto+Sans+Shavian&family=Noto+Sans+Sinhala:wght@100..900&family=Noto+Sans+Sunuwar&family=Noto+Sans+TC:wght@100..900&family=Noto+Sans+Takri&family=Noto+Sans+Tamil:wght@100..900&family=Noto+Sans+Telugu:wght@100..900&family=Noto+Sans+Thai+Looped:wght@100..900&family=Noto+Sans+Thai:wght@100..900&family=Noto+Sans+Vithkuqi:wght@400..700&family=Noto+Sans+Warang+Citi&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans+Armenian:wght@100..900&family=Noto+Sans+Bengali:wght@100..900&family=Noto+Sans+Devanagari:wght@100..900&family=Noto+Sans+Georgian:wght@100..900&family=Noto+Sans+Gujarati:wght@100..900&family=Noto+Sans+HK:wght@100..900&family=Noto+Sans+Hebrew:wght@100..900&family=Noto+Sans+JP:wght@100..900&family=Noto+Sans+KR:wght@100..900&family=Noto+Sans+Kannada:wght@100..900&family=Noto+Sans+Khmer:wght@100..900&family=Noto+Sans+Lao+Looped:wght@100..900&family=Noto+Sans+Lao:wght@100..900&family=Noto+Sans+Malayalam:wght@100..900&family=Noto+Sans+Marchen&family=Noto+Sans+Meetei+Mayek:wght@100..900&family=Noto+Sans+Multani&family=Noto+Sans+NKo&family=Noto+Sans+Old+Permic&family=Noto+Sans+SC:wght@100..900&family=Noto+Sans+Shavian&family=Noto+Sans+Sinhala:wght@100..900&family=Noto+Sans+Sunuwar&family=Noto+Sans+TC:wght@100..900&family=Noto+Sans+Takri&family=Noto+Sans+Tamil:wght@100..900&family=Noto+Sans+Telugu:wght@100..900&family=Noto+Sans+Thai+Looped:wght@100..900&family=Noto+Sans+Thai:wght@100..900&family=Noto+Sans+Vithkuqi:wght@400..700&family=Noto+Sans+Warang+Citi&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap");
 
 :root {
 	--noto-sans-universal:
-		'Noto Sans',
-
-		'Noto Sans HK',
-		'Noto Sans JP',
-		'Noto Sans KR',
-		'Noto Sans SC',
-		'Noto Sans TC',
-		'Noto Sans Arabic',
-		'Noto Sans Armenian',
-		'Noto Sans Bengali',
-		'Noto Sans Devanagari',
-		'Noto Sans Georgian',
-		'Noto Sans Gujarati',
-		'Noto Sans Hebrew',
-		'Noto Sans Kannada',
-		'Noto Sans Khmer',
-		'Noto Sans Lao Looped',
-		'Noto Sans Lao',
-		'Noto Sans Malayalam',
-		'Noto Sans Marchen',
-		'Noto Sans Meetei Mayek',
-		'Noto Sans Multani',
-		'Noto Sans NKo',
-		'Noto Sans Old Permic',
-		'Noto Sans Shavian',
-		'Noto Sans Sinhala',
-		'Noto Sans Sunuwar',
-		'Noto Sans Takri',
-		'Noto Sans Tamil',
-		'Noto Sans Telugu',
-		'Noto Sans Thai Looped',
-		'Noto Sans Thai',
-		'Noto Sans Vithkuqi',
-		'Noto Sans Warang Citi';
+		"Noto Sans", "Noto Sans HK", "Noto Sans JP", "Noto Sans KR", "Noto Sans SC",
+		"Noto Sans TC", "Noto Sans Arabic", "Noto Sans Armenian",
+		"Noto Sans Bengali", "Noto Sans Devanagari", "Noto Sans Georgian",
+		"Noto Sans Gujarati", "Noto Sans Hebrew", "Noto Sans Kannada",
+		"Noto Sans Khmer", "Noto Sans Lao Looped", "Noto Sans Lao",
+		"Noto Sans Malayalam", "Noto Sans Marchen", "Noto Sans Meetei Mayek",
+		"Noto Sans Multani", "Noto Sans NKo", "Noto Sans Old Permic",
+		"Noto Sans Shavian", "Noto Sans Sinhala", "Noto Sans Sunuwar",
+		"Noto Sans Takri", "Noto Sans Tamil", "Noto Sans Telugu",
+		"Noto Sans Thai Looped", "Noto Sans Thai", "Noto Sans Vithkuqi",
+		"Noto Sans Warang Citi";
 
 	/* Colors */
 	--blyrics-ui-text-color: var(
@@ -58,18 +35,19 @@
 	);
 	--blyrics-lyric-inactive-color: color(
 		from var(--blyrics-text-color, color(display-p3 1 1 1)) display-p3 r g b /
-		var(--blyrics-inactive-opacity, 0.3)
+			var(--blyrics-inactive-opacity, 0.3)
 	);
 
 	--blyrics-richsync-timing-offset: 0.115s;
-	--blyrics-timing-offset: 0.020s;
+	--blyrics-timing-offset: 0.02s;
 
 	--blyrics-scroll-timing-offset: 0.5s;
 
 	/* Typography */
 	--blyrics-font-family:
-		Satoshi, var(--noto-sans-universal), Avenir, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
-		Open Sans, Helvetica Neue, sans-serif;
+		Satoshi, var(--noto-sans-universal), Avenir, -apple-system,
+		BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans,
+		Helvetica Neue, sans-serif;
 	--blyrics-font-size: 3rem;
 	--blyrics-font-weight: 700;
 	--blyrics-line-height: 1.333;
@@ -78,8 +56,7 @@
 	--blyrics-translated-font-weight: 600;
 	--blyrics-translated-font-family: var(--blyrics-font-family);
 	--blyrics-translated-color: color(
-		display-p3 1 1 1 /
-		var(--blyrics-translated-opacity, 0.6)
+		display-p3 1 1 1 / var(--blyrics-translated-opacity, 0.6)
 	);
 
 	--blyrics-footer-font-family: Roboto, Noto Naskh Arabic UI, Arial, sans-serif;
@@ -126,14 +103,13 @@
 
 	/* Gradient stops */
 	--blyrics-gradient-stops:
-		transparent 0%, rgba(0, 0, 0, 0.013) 8.1%,
-		rgba(0, 0, 0, 0.049) 15.5%, rgba(0, 0, 0, 0.104) 22.5%,
-		rgba(0, 0, 0, 0.175) 29%, rgba(0, 0, 0, 0.259) 35.3%,
-		rgba(0, 0, 0, 0.352) 41.2%, rgba(0, 0, 0, 0.45) 47.1%,
-		rgba(0, 0, 0, 0.55) 52.9%, rgba(0, 0, 0, 0.648) 58.8%,
-		rgba(0, 0, 0, 0.741) 64.7%, rgba(0, 0, 0, 0.825) 71%,
-		rgba(0, 0, 0, 0.896) 77.5%, rgba(0, 0, 0, 0.951) 84.5%,
-		rgba(0, 0, 0, 0.987) 91.9%, #000 100%;
+		transparent 0%, rgba(0, 0, 0, 0.013) 8.1%, rgba(0, 0, 0, 0.049) 15.5%,
+		rgba(0, 0, 0, 0.104) 22.5%, rgba(0, 0, 0, 0.175) 29%,
+		rgba(0, 0, 0, 0.259) 35.3%, rgba(0, 0, 0, 0.352) 41.2%,
+		rgba(0, 0, 0, 0.45) 47.1%, rgba(0, 0, 0, 0.55) 52.9%,
+		rgba(0, 0, 0, 0.648) 58.8%, rgba(0, 0, 0, 0.741) 64.7%,
+		rgba(0, 0, 0, 0.825) 71%, rgba(0, 0, 0, 0.896) 77.5%,
+		rgba(0, 0, 0, 0.951) 84.5%, rgba(0, 0, 0, 0.987) 91.9%, #000 100%;
 }
 
 /* Main container styles */
@@ -171,8 +147,6 @@
 	cursor: default;
 }
 
-
-
 :not(.blyrics-background-lyric) {
 	order: 0;
 }
@@ -182,8 +156,8 @@
 }
 
 .blyrics--line > span > span.blyrics-background-lyric {
-	font-size: 0.8em;
-	font-style: italic;
+	font-size: 0.75em;
+	font-weight: 500;
 }
 
 .blyrics--line {
@@ -248,21 +222,16 @@
 	box-sizing: content-box;
 	width: 100%;
 	background-image: linear-gradient(
-			90deg,
-			var(--blyrics-lyric-active-color) calc(
-					100% *
-					var(--lyric-transition-amount-start) -
-					4rem *
-					var(--lyric-transition-amount-start) +
-					2rem
+		90deg,
+		var(--blyrics-lyric-active-color)
+			calc(
+				100% * var(--lyric-transition-amount-start) - 4rem *
+					var(--lyric-transition-amount-start) + 2rem
 			),
-			#00000000 calc(
-					100% *
-					var(--lyric-transition-amount-end) -
-					4rem *
-					var(--lyric-transition-amount-end) +
-					2rem +
-					1px
+		#00000000
+			calc(
+				100% * var(--lyric-transition-amount-end) - 4rem *
+					var(--lyric-transition-amount-end) + 2rem + 1px
 			)
 	);
 	opacity: 0;
@@ -284,7 +253,9 @@
 	opacity: 0;
 }
 
-.blyrics--word.blyrics--pre-animating:not(.blyrics--animating):not(.blyrics-zero-dur-animate)::after {
+.blyrics--word.blyrics--pre-animating:not(.blyrics--animating):not(
+		.blyrics-zero-dur-animate
+	)::after {
 	opacity: 1;
 }
 
@@ -296,13 +267,15 @@
 
 	--lyric-transition-amount-start: 1.4;
 	--lyric-transition-amount-end: 1.5;
-	transition-property: --lyric-transition-amount-start,
-		--lyric-transition-amount-end, opacity;
-	transition-duration: calc(var(--blyrics-duration) * 1.6),
-		calc(var(--blyrics-duration) * 1.6),
+	transition-property:
+		--lyric-transition-amount-start, --lyric-transition-amount-end, opacity;
+	transition-duration:
+		calc(var(--blyrics-duration) * 1.6), calc(var(--blyrics-duration) * 1.6),
 		var(--blyrics-lyric-highlight-fade-in-duration);
 	transition-timing-function: linear, linear, ease;
-	transition-delay: var(--blyrics-swipe-delay), var(--blyrics-swipe-delay), var(--blyrics-anim-delay);
+	transition-delay:
+		var(--blyrics-swipe-delay), var(--blyrics-swipe-delay),
+		var(--blyrics-anim-delay);
 }
 
 .blyrics-rtl {
@@ -354,7 +327,7 @@
 	animation: blyrics-pulse 1.5s infinite;
 }
 
-#blyrics-loader[small-loader][active]  {
+#blyrics-loader[small-loader][active] {
 	padding-top: 5rem;
 	height: 5rem;
 }
@@ -712,12 +685,9 @@
 		margin-inline: 4rem !important;
 	}
 	.blyrics-container:before {
-		background: linear-gradient(
-				to right,
-				#030303 4rem,
-				rgba(3, 3, 3, 0.5),
-				#030303 96%
-			), var(--blyrics-background-img) !important;
+		background:
+			linear-gradient(to right, #030303 4rem, rgba(3, 3, 3, 0.5), #030303 96%),
+			var(--blyrics-background-img) !important;
 		background-position: 50% !important;
 		background-size: cover !important;
 		border-radius: 1rem;
@@ -743,10 +713,10 @@
 		top: -2rem;
 		transform: translateX(0) translateY(0) !important;
 	}
-	#blyrics-wrapper{
+	#blyrics-wrapper {
 		margin-top: 0;
 	}
-	#blyrics-spacing-element{
+	#blyrics-spacing-element {
 		height: 48px !important;
 	}
 	.blyrics-footer {
