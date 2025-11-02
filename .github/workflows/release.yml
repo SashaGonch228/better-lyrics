@@ -1,140 +1,132 @@
-name: Release & Publish
+name: Release
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The new version number (e.g., 2.1.0)'
+        required: true
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      RELEASE_EXISTS: ${{ steps.release_exists.outputs.RELEASE_EXISTS }}
     steps:
       - uses: actions/checkout@v3
-
-      - name: "Install and setup jq"
-        uses: dcarbone/install-jq-action@v2
-
-      - name: Read version from manifest.json
-        id: read_version
-        run: |
-          VERSION=$(jq -r '.version' manifest.json)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check if release exists
-        id: release_exists
-        run: |
-          TAG_NAME="${{ steps.read_version.outputs.tag }}"
-          API_URL="${{ github.api_url }}/repos/${{ github.repository }}/releases/tags/${TAG_NAME}"
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL")
-          if [[ $RESPONSE -eq 200 ]]; then
-            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Release exists, skipping build and publish steps"
-          else
-            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "Release does not exist, continuing with build and publish steps"
-          fi
-
-      - name: Run build script
-        if: steps.release_exists.outputs.RELEASE_EXISTS == 'false'
-        run: |
-          npm install -g postcss postcss-cli autoprefixer cssnano
-          bash scripts/build.sh
-        shell: bash
-
-      - name: Upload artifact
-        if: steps.release_exists.outputs.RELEASE_EXISTS == 'false'
-        uses: actions/upload-artifact@v4
         with:
-          name: better-lyrics
-          path: dist/
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Update version in files
+        run: npm run update-version -- ${{ github.event.inputs.version }}
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Sign Firefox extension
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
+        run: |
+          npm install -g web-ext
+          XPI_FILE=$(find dist/firefox -name "*.xpi")
+          mkdir -p firefox-build
+          unzip $XPI_FILE -d firefox-build
+          web-ext sign --source-dir firefox-build --artifacts-dir dist/firefox
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            dist/chrome/better-lyrics-*.zip
+            dist/edge/better-lyrics-*.zip
+            dist/firefox/web-ext-artifacts/*.xpi
+
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Release version ${{ github.event.inputs.version }}"
+          git tag -a "v${{ github.event.inputs.version }}" -m "Version ${{ github.event.inputs.version }}"
+          git push --follow-tags
 
       - name: Create GitHub Release
-        if: steps.release_exists.outputs.RELEASE_EXISTS == 'false'
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/better-lyrics-chrome.zip,dist/better-lyrics-edge.zip,dist/better-lyrics-firefox.zip"
-          tag: ${{ steps.read_version.outputs.tag }}
-          generateReleaseNotes: true
-          skipIfReleaseExists: true
+          artifacts: "dist/chrome/better-lyrics-*.zip,dist/edge/better-lyrics-*.zip,dist/firefox/web-ext-artifacts/*.xpi"
+          tag: "v${{ github.event.inputs.version }}"
+          name: "Release ${{ github.event.inputs.version }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-chrome:
-    name: Publish to Chrome Web Store
+    needs: release
     runs-on: ubuntu-latest
-    needs: build
-    if: needs.build.outputs.RELEASE_EXISTS == 'false'
-    env:
-      EXTENSION_ID: effdbpeggelllpfkjppbokhmmiinhlmg
-      CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          name: better-lyrics
-          path: dist/
-
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+          path: dist
       - name: Publish to Chrome Web Store
-        run: |
-          bash scripts/publish-chrome.sh
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: tsx tooling/publish-chrome.ts
 
   publish-firefox:
-    name: Publish to Firefox Add-ons
+    needs: release
     runs-on: ubuntu-latest
-    needs: build
-    if: needs.build.outputs.RELEASE_EXISTS == 'false'
-    env:
-      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_CLIENT_ID }}
-      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_CLIENT_SECRET }}
-      FIREFOX_EXTENSION_ID: betterlyrics@boidu.dev
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          name: better-lyrics
-          path: dist/
-
-      - name: Create zip file of source code
-        run: |
-          zip -r dist/better-lyrics-src.zip . -x "*www*" "*api*"
-
-      - name: Publish to Firefox
-        run: |
-          bash scripts/publish-firefox.sh
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Publish to Firefox Add-ons
+        env:
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+        run: tsx tooling/publish-firefox.ts
 
   publish-edge:
-    name: Publish to Edge Add-ons
+    needs: release
     runs-on: ubuntu-latest
-    needs: build
-    if: needs.build.outputs.RELEASE_EXISTS == 'false'
-    env:
-      CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
-      API_KEY: ${{ secrets.EDGE_API_KEY }}
-      PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          name: better-lyrics
-          path: dist/
-
-      - name: Publish to Edge
-        run: |
-          bash scripts/publish-edge.sh
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Publish to Edge Add-ons
+        env:
+          CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          API_KEY: ${{ secrets.EDGE_API_KEY }}
+          PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+        run: tsx tooling/publish-edge.ts
