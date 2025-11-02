@@ -8,7 +8,7 @@
         "dev": "extension dev --browser chrome --polyfill",
         "dev:brave": "extension dev --chromium-binary \"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser\" --polyfill",
         "start": "extension start --polyfill",
-        "build": "extension build --zip --browser all --polyfill",
+        "build": "extension build --browser all --polyfill",
         "preview": "extension preview --polyfill",
         "lint": "npx @biomejs/biome lint --write . && npx @biomejs/biome format --write .",
         "update-version": "tsx tooling/update-version.ts",

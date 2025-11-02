@@ -34,26 +34,25 @@ jobs:
       - name: Build extension
         run: npm run build
 
+      - name: Upload Chrome artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-nightly
+          path: dist/chrome
+
+      - name: Upload Edge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-nightly
+          path: dist/edge
+
       - name: Sign Firefox extension
-        continue-on-error: true
         run: |
           npm install -g web-ext
           XPI_FILE=$(find dist/firefox -name "*.xpi")
           mkdir -p firefox-build
           unzip $XPI_FILE -d firefox-build
           web-ext sign --channel=unlisted --api-key=${{ secrets.FIREFOX_JWT_ISSUER }} --api-secret=${{ secrets.FIREFOX_JWT_SECRET }} --upload-source-code
-
-      - name: Upload Chrome artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: chrome-nightly
-          path: dist/chrome/better-lyrics-*.zip
-
-      - name: Upload Edge artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: edge-nightly
-          path: dist/edge/better-lyrics-*.zip
 
       - name: Upload Firefox artifact
         uses: actions/upload-artifact@v4

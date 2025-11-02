@@ -44,8 +44,8 @@ jobs:
         with:
           name: release-artifacts
           path: |
-            dist/chrome/better-lyrics-*.zip
-            dist/edge/better-lyrics-*.zip
+            dist/chrome
+            dist/edge
             dist/firefox/web-ext-artifacts/*.xpi
 
       - name: Commit version changes
@@ -60,7 +60,7 @@ jobs:
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/chrome/better-lyrics-*.zip,dist/edge/better-lyrics-*.zip,dist/firefox/web-ext-artifacts/*.xpi"
+          artifacts: "dist/chrome,dist/edge,dist/firefox/web-ext-artifacts/*.xpi"
           tag: "v${{ github.event.inputs.version }}"
           name: "Release ${{ github.event.inputs.version }}"
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -79,6 +79,9 @@ jobs:
         with:
           name: release-artifacts
           path: dist
+      - name: Zip Chrome artifact
+        run: |          
+          zip -r dist/better-lyrics-chrome.zip dist/chrome
       - name: Publish to Chrome Web Store
         env:
           EXTENSION_ID: ${{ secrets.GOOGLE_EXTENSION_ID }}
@@ -101,6 +104,9 @@ jobs:
         with:
           name: release-artifacts
           path: dist
+      - name: Prepare Firefox artifact
+        run: |
+          find dist/firefox/web-ext-artifacts -name "*.xpi" -exec mv {} dist/better-lyrics-firefox.zip \;
       - name: Publish to Firefox Add-ons
         env:
           FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
@@ -121,6 +127,9 @@ jobs:
         with:
           name: release-artifacts
           path: dist
+      - name: Zip Edge artifact
+        run: |
+          zip -r dist/better-lyrics-edge.zip dist/edge
       - name: Publish to Edge Add-ons
         env:
           CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
