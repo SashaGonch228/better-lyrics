@@ -1,9 +1,6 @@
-name: Nightly Build
+name: Build
 
-on:
-  push:
-    branches:
-      - master
+on: push
 
 jobs:
   build:
@@ -23,13 +20,16 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           HASH=$(git rev-parse --short HEAD)
-          echo "NIGHTLY_VERSION=$VERSION-$HASH-nightly" >> $GITHUB_ENV
+          echo "NIGHTLY_VERSION=$VERSION.${{ github.run_number }}-dev ($HASH)" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: npm install
 
+      - name: Run Typescript
+        run: npm run typecheck
+
       - name: Update version in files
-        run: npm run update-version -- ${{ env.NIGHTLY_VERSION }}
+        run: npm run update-version -- "${{ env.NIGHTLY_VERSION }}"
 
       - name: Build extension
         run: npm run build
@@ -37,22 +37,17 @@ jobs:
       - name: Upload Chrome artifact
         uses: actions/upload-artifact@v4
         with:
-          name: chrome-nightly-${{ env.NIGHTLY_VERSION }}
+          name: chrome-v${{ env.NIGHTLY_VERSION }}
           path: dist/chrome
 
       - name: Upload Edge artifact
         uses: actions/upload-artifact@v4
         with:
-          name: edge-nightly-${{ env.NIGHTLY_VERSION }}
+          name: edge-v${{ env.NIGHTLY_VERSION }}
           path: dist/edge
-
-      - name: Sign Firefox extension
-        run: |
-          npm install -g web-ext
-          web-ext sign --channel=unlisted --api-key=${{ secrets.FIREFOX_JWT_ISSUER }} --api-secret=${{ secrets.FIREFOX_JWT_SECRET }} --upload-source-code
 
       - name: Upload Firefox artifact
         uses: actions/upload-artifact@v4
         with:
-          name: firefox-nightly-${{ env.NIGHTLY_VERSION }}
-          path: dist/firefox/web-ext-artifacts/*.xpi
+          name: firefox-v${{ env.NIGHTLY_VERSION }}
+          path: dist/firefox

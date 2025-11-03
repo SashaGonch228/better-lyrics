@@ -4,49 +4,63 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The new version number (e.g., 2.1.0)'
+        description: "The new version number. Use 3 digits for a release (e.g., 2.1.0) and 4 digits for a canary (e.g., 2.1.0.1-canary)."
         required: true
+      is_canary:
+        description: "This a canary (pre-release) build?"
+        type: boolean
+        default: true
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ github.event.inputs.version }}
     steps:
-      - uses: actions/checkout@v3
+      - name: ⛔ Validate Version Format
+        run: |
+          IS_CANARY='${{ github.event.inputs.is_canary }}'
+          VERSION='${{ github.event.inputs.version }}'
+
+          if [[ "$IS_CANARY" == "true" ]]; then
+            # Rule: Must be 4 digits, optional suffix
+            if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+              echo "::error::Canary releases must use a 4-digit version (e.g., 2.1.0.1 or 2.1.0.1-canary)."
+              exit 1
+            fi
+            echo "Version format is valid for canary."
+          else
+            # Rule: Must be exactly 3 digits
+            if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Full releases must use a 3-digit version (e.g., 2.1.0)."
+              exit 1
+            fi
+            echo "Version format is valid for release."
+          fi
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: "20.x"
 
       - name: Install dependencies
         run: npm install
+
+      - name: Run Typescript
+        run: npm run typecheck
 
       - name: Update version in files
         run: npm run update-version -- ${{ github.event.inputs.version }}
 
       - name: Build extension
         run: npm run build
-
-      - name: Sign Firefox extension
-        run: |
-          npm install -g web-ext
-          XPI_FILE=$(find dist/firefox -name "*.xpi")
-          mkdir -p firefox-build
-          unzip $XPI_FILE -d firefox-build
-          web-ext sign --channel=unlisted --api-key=${{ secrets.FIREFOX_JWT_ISSUER }} --api-secret=${{ secrets.FIREFOX_JWT_SECRET }} --upload-source-code
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: release-artifacts
-          path: |
-            dist/chrome
-            dist/edge
-            dist/firefox/web-ext-artifacts/*.xpi
 
       - name: Commit version changes
         run: |
@@ -57,13 +71,24 @@ jobs:
           git tag -a "v${{ github.event.inputs.version }}" -m "Version ${{ github.event.inputs.version }}"
           git push --follow-tags
 
-      - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
+      # Uploading raw build directories for other jobs
+      - name: Upload Chrome build
+        uses: actions/upload-artifact@v4
         with:
-          artifacts: "dist/chrome,dist/edge,dist/firefox/web-ext-artifacts/*.xpi"
-          tag: "v${{ github.event.inputs.version }}"
-          name: "Release ${{ github.event.inputs.version }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: chrome-build
+          path: dist/chrome
+
+      - name: Upload Edge build
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-build
+          path: dist/edge
+
+      - name: Upload Firefox build
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-build
+          path: dist/firefox
 
   publish-chrome:
     needs: release
@@ -72,46 +97,99 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: "20.x"
       - name: Install dependencies
         run: npm install
-      - uses: actions/download-artifact@v3
+
+      - name: Download Chrome build
+        uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
-          path: dist
+          name: chrome-build
+          path: dist/chrome
+
       - name: Zip Chrome artifact
-        run: |          
-          zip -r dist/better-lyrics-chrome.zip dist/chrome
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+          cd dist/chrome
+          zip -r ../chrome-v$VERSION.zip .
+
       - name: Publish to Chrome Web Store
+        if: github.event.inputs.is_canary == 'false'
         env:
           EXTENSION_ID: ${{ secrets.GOOGLE_EXTENSION_ID }}
           CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET}}
           REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-        run: tsx tooling/publish-chrome.ts
+        run: tsx tooling/publish-chrome.ts dist/chrome-v${{ needs.release.outputs.version }}.zip
+
+      - name: Upload Chrome Zip for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-release-asset
+          path: dist/chrome-v${{ needs.release.outputs.version }}.zip
 
   publish-firefox:
     needs: release
     runs-on: ubuntu-latest
+    env:
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: "20.x"
       - name: Install dependencies
         run: npm install
-      - uses: actions/download-artifact@v3
+
+      - name: Download Firefox build
+        uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
-          path: dist
-      - name: Prepare Firefox artifact
+          name: firefox-build
+          path: dist/firefox
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      - name: Sign Firefox Add-on (Canary - Unlisted)
+        if: github.event.inputs.is_canary == 'true'
         run: |
-          find dist/firefox/web-ext-artifacts -name "*.xpi" -exec mv {} dist/better-lyrics-firefox.zip \;
-      - name: Publish to Firefox Add-ons
-        env:
-          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
-          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
-        run: tsx tooling/publish-firefox.ts
+          web-ext sign --channel=unlisted \
+                       --api-key=${{ env.FIREFOX_JWT_ISSUER }} \
+                       --api-secret=${{ env.FIREFOX_JWT_SECRET }} \
+                       --artifacts-dir=dist/signed-firefox \
+                       --source-dir=dist/firefox
+          echo "Canary version signed."
+
+      - name: Sign and Publish Firefox Add-on (Regular - Listed)
+        if: github.event.inputs.is_canary == 'false'
+        run: |
+          web-ext sign --channel=listed \
+                       --api-key=${{ env.FIREFOX_JWT_ISSUER }} \
+                       --api-secret=${{ env.FIREFOX_JWT_SECRET }} \
+                       --upload-source-code \
+                       --artifacts-dir=dist/signed-firefox \
+                       --source-dir=dist/firefox
+          echo "Regular version signed and published."
+
+      - name: Rename signed artifact
+        run: |
+          ARTIFACT_DIR=dist/signed-firefox
+          SIGNED_FILE=$(find $ARTIFACT_DIR -name "*.xpi")
+          if [ -n "$SIGNED_FILE" ]; then
+            mv "$SIGNED_FILE" "$ARTIFACT_DIR/firefox-v${{ env.RELEASE_VERSION }}.xpi"
+            echo "Renamed artifact to firefox-v${{ env.RELEASE_VERSION }}.xpi"
+          else
+            echo "::error::Signed .xpi file not found!"
+            exit 1
+          fi
+
+      - name: Upload Firefox XPI for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-release-asset
+          path: dist/signed-firefox/firefox-v${{ env.RELEASE_VERSION }}.xpi
 
   publish-edge:
     needs: release
@@ -120,19 +198,68 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: "20.x"
       - name: Install dependencies
         run: npm install
-      - uses: actions/download-artifact@v3
+
+      - name: Download Edge build
+        uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
-          path: dist
+          name: edge-build
+          path: dist/edge
+
       - name: Zip Edge artifact
         run: |
-          zip -r dist/better-lyrics-edge.zip dist/edge
+          VERSION=${{ needs.release.outputs.version }}
+          cd dist/edge
+          zip -r ../edge-v$VERSION.zip .
+
       - name: Publish to Edge Add-ons
+        if: github.event.inputs.is_canary == 'false'
         env:
           CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
           API_KEY: ${{ secrets.EDGE_API_KEY }}
           PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
-        run: tsx tooling/publish-edge.ts
+        run: tsx tooling/publish-edge.ts dist/edge-v${{ needs.release.outputs.version }}.zip
+
+      - name: Upload Edge Zip for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-release-asset
+          path: dist/edge-v${{ needs.release.outputs.version }}.zip
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: [release, publish-chrome, publish-edge, publish-firefox]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download chrome release files
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-release-asset
+          path: release-artifacts
+
+      - name: Download firefox release files
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox-release-asset
+          path: release-artifacts
+
+      - name: Download edge release files
+        uses: actions/download-artifact@v4
+        with:
+          name: edge-release-asset
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release-artifacts/*"
+          tag: "v${{ needs.release.outputs.version }}"
+          name: "v${{ needs.release.outputs.version }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Mark as pre-release if it's a canary build
+          prerelease: ${{ github.event.inputs.is_canary == 'true' }}
+          draft: true

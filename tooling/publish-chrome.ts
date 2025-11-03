@@ -1,13 +1,19 @@
 import { execSync } from "child_process";
 
+const zipPath = process.argv[2] || "./dist/better-lyrics-chrome.zip";
+
 const extensionId = process.env.EXTENSION_ID;
 const clientId = process.env.CLIENT_ID;
 const clientSecret = process.env.CLIENT_SECRET;
 const refreshToken = process.env.REFRESH_TOKEN;
-const zipPath = "./dist/better-lyrics-chrome.zip";
 
 if (!extensionId || !clientId || !clientSecret || !refreshToken) {
   console.error("Missing environment variables for Chrome Web Store publishing.");
+  process.exit(1);
+}
+
+if (!zipPath) {
+  console.error("No zip file path provided.");
   process.exit(1);
 }
 
