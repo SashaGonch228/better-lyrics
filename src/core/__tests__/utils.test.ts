@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import chrome from 'sinon-chrome';
 import * as Utils from '../utils';
-import { mockChromeStorage } from '../../../tests/test-utils';
+import { mockChromeStorage } from '@tests/test-utils';
 
 describe('Utils Module', () => {
   beforeEach(() => {
@@ -94,7 +94,7 @@ describe('Utils Module', () => {
   describe('log', () => {
     it('should log when isLogsEnabled is true', (done) => {
       mockChromeStorage({ isLogsEnabled: true });
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       Utils.log('test message', 'arg2');
 
@@ -107,7 +107,7 @@ describe('Utils Module', () => {
 
     it('should not log when isLogsEnabled is false', (done) => {
       mockChromeStorage({ isLogsEnabled: false });
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       Utils.log('test message');
 
@@ -122,7 +122,7 @@ describe('Utils Module', () => {
   describe('setUpLog', () => {
     it('should configure log to use console.log when enabled', (done) => {
       mockChromeStorage({ isLogsEnabled: true });
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       Utils.setUpLog();
 
@@ -136,7 +136,7 @@ describe('Utils Module', () => {
 
     it('should configure log to be no-op when disabled', (done) => {
       mockChromeStorage({ isLogsEnabled: false });
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       Utils.setUpLog();
 

@@ -18,6 +18,10 @@ let cache: Cache = {
 };
 
 export async function translateText(text: string, targetLanguage: string): Promise<TranslationResult | null> {
+  if (text.trim() === '') {
+    return null;
+  }
+
   let url = Constants.TRANSLATE_LYRICS_URL(targetLanguage, text);
 
   const cacheKey = `${targetLanguage}_${text}`;
@@ -49,6 +53,10 @@ export async function translateText(text: string, targetLanguage: string): Promi
 }
 
 export async function translateTextIntoRomaji(lang: string, text: string): Promise<string | null> {
+  if (text.trim() === '') {
+    return null;
+  }
+
   const cacheKey = text;
   if (cache.romanization.has(cacheKey)) {
     return cache.romanization.get(cacheKey) as string;
@@ -99,6 +107,7 @@ export function onTranslationEnabled(
 export function clearCache(): void {
   cache.romanization.clear();
   cache.translation.clear();
+  currentTranslationLanguage = "en";
 }
 
 export function getTranslationFromCache(text: string, targetLanguage: string): TranslationResult | null {

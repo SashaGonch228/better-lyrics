@@ -12,7 +12,7 @@ export function createMockProviderParameters(overrides?: Partial<ProviderParamet
     videoId: 'test-video-id',
     audioTrackData: {
       captionTracks: []
-    },
+    } as any,
     album: 'Test Album',
     sourceMap: {} as SourceMapType,
     alwaysFetchMetadata: false,
@@ -100,7 +100,9 @@ export function mockChromeStorage(data: Record<string, any> = {}) {
   chrome.storage.local.get.callsFake((keys: any, callback?: (items: any) => void) => {
     const result: Record<string, any> = {};
 
-    if (typeof keys === 'string') {
+    if (keys === null || keys === undefined) {
+      Object.assign(result, storageData);
+    } else if (typeof keys === 'string') {
       result[keys] = storageData[keys];
     } else if (Array.isArray(keys)) {
       keys.forEach(key => {

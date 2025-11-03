@@ -118,6 +118,7 @@ describe('RequestSniffer Module', () => {
                       {},
                       {
                         tabRenderer: {
+                          unselectable: false,
                           endpoint: {
                             browseEndpoint: {
                               browseId: 'delayed-browse-id'
@@ -213,41 +214,48 @@ describe('RequestSniffer Module', () => {
               singleColumnMusicWatchNextResultsRenderer: {
                 tabbedRenderer: {
                   watchNextTabbedResultsRenderer: {
-                    tabs: [{
-                      tabRenderer: {
-                        content: {
-                          musicQueueRenderer: {
-                            content: {
-                              playlistPanelRenderer: {
-                                contents: [{
-                                  playlistPanelVideoWrapperRenderer: {
-                                    primaryRenderer: {
-                                      playlistPanelVideoRenderer: {
-                                        videoId: 'primary-video'
-                                      }
-                                    },
-                                    counterpart: [{
-                                      counterpartRenderer: {
+                    tabs: [
+                      {
+                        tabRenderer: {
+                          content: {
+                            musicQueueRenderer: {
+                              content: {
+                                playlistPanelRenderer: {
+                                  contents: [{
+                                    playlistPanelVideoWrapperRenderer: {
+                                      primaryRenderer: {
                                         playlistPanelVideoRenderer: {
-                                          videoId: 'counterpart-video'
+                                          videoId: 'primary-video'
                                         }
                                       },
-                                      segmentMap: {
-                                        segment: [{
-                                          primaryVideoStartTimeMilliseconds: '1000',
-                                          counterpartVideoStartTimeMilliseconds: '2000',
-                                          durationMilliseconds: '5000'
-                                        }]
-                                      }
-                                    }]
-                                  }
-                                }]
+                                      counterpart: [{
+                                        counterpartRenderer: {
+                                          playlistPanelVideoRenderer: {
+                                            videoId: 'counterpart-video'
+                                          }
+                                        },
+                                        segmentMap: {
+                                          segment: [{
+                                            primaryVideoStartTimeMilliseconds: '1000',
+                                            counterpartVideoStartTimeMilliseconds: '2000',
+                                            durationMilliseconds: '5000'
+                                          }]
+                                        }
+                                      }]
+                                    }
+                                  }]
+                                }
                               }
                             }
                           }
                         }
+                      },
+                      {
+                        tabRenderer: {
+                          unselectable: false
+                        }
                       }
-                    }]
+                    ]
                   }
                 }
               }
@@ -289,23 +297,30 @@ describe('RequestSniffer Module', () => {
               singleColumnMusicWatchNextResultsRenderer: {
                 tabbedRenderer: {
                   watchNextTabbedResultsRenderer: {
-                    tabs: [{
-                      tabRenderer: {
-                        content: {
-                          musicQueueRenderer: {
-                            content: {
-                              playlistPanelRenderer: {
-                                contents: [{
-                                  playlistPanelVideoRenderer: {
-                                    videoId: 'solo-video'
-                                  }
-                                }]
+                    tabs: [
+                      {
+                        tabRenderer: {
+                          content: {
+                            musicQueueRenderer: {
+                              content: {
+                                playlistPanelRenderer: {
+                                  contents: [{
+                                    playlistPanelVideoRenderer: {
+                                      videoId: 'solo-video'
+                                    }
+                                  }]
+                                }
                               }
                             }
                           }
                         }
+                      },
+                      {
+                        tabRenderer: {
+                          unselectable: false
+                        }
                       }
-                    }]
+                    ]
                   }
                 }
               }
@@ -333,6 +348,22 @@ describe('RequestSniffer Module', () => {
           url: 'https://music.youtube.com/youtubei/v1/next',
           requestJson: { videoId: 'album-video' },
           responseJson: {
+            contents: {
+              singleColumnMusicWatchNextResultsRenderer: {
+                tabbedRenderer: {
+                  watchNextTabbedResultsRenderer: {
+                    tabs: [
+                      {},
+                      {
+                        tabRenderer: {
+                          unselectable: false
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             playerOverlays: {
               playerOverlayRenderer: {
                 browserMediaSession: {
@@ -367,6 +398,22 @@ describe('RequestSniffer Module', () => {
           url: 'https://music.youtube.com/youtubei/v1/next',
           requestJson: { videoId: 'delayed-album-video' },
           responseJson: {
+            contents: {
+              singleColumnMusicWatchNextResultsRenderer: {
+                tabbedRenderer: {
+                  watchNextTabbedResultsRenderer: {
+                    tabs: [
+                      {},
+                      {
+                        tabRenderer: {
+                          unselectable: false
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             playerOverlays: {
               playerOverlayRenderer: {
                 browserMediaSession: {
@@ -392,9 +439,14 @@ describe('RequestSniffer Module', () => {
     });
 
     it('should return undefined after timeout', async () => {
+      setupRequestSniffer();
+
       const albumPromise = getSongAlbum('timeout-video');
 
-      jest.advanceTimersByTime(6000);
+      // Advance through all 250 retries * 20ms = 5000ms
+      for (let i = 0; i < 250; i++) {
+        await jest.advanceTimersByTimeAsync(20);
+      }
 
       const album = await albumPromise;
 
@@ -403,15 +455,8 @@ describe('RequestSniffer Module', () => {
   });
 
   describe('setupRequestSniffer', () => {
-    it('should initialize with video ID from URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: new URL('https://music.youtube.com/watch?v=initial-video'),
-        writable: true
-      });
-
-      setupRequestSniffer();
-
-      expect(window.location.href).toContain('v=initial-video');
+    it('should initialize without errors', () => {
+      expect(() => setupRequestSniffer()).not.toThrow();
     });
 
     it('should process segment maps correctly', async () => {

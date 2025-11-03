@@ -76,7 +76,7 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
   if (keepLoaderVisible) {
     DOM.renderLoader(true);
   } else {
-    DOM.flushLoader(allZero && lyrics[0].words !== Constants.NO_LYRICS_TEXT);
+    DOM.flushLoader(allZero && lyrics.length > 0 && lyrics[0].words !== Constants.NO_LYRICS_TEXT);
   }
 
   const langPromise = new Promise<string>(async resolve => {
@@ -405,9 +405,9 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
   }
   DOM.animEngineState.scrollResumeTime = 0;
 
-  if (lyrics[0].words !== Constants.NO_LYRICS_TEXT) {
+  if (lyrics.length > 0 && lyrics[0].words !== Constants.NO_LYRICS_TEXT) {
     DOM.addFooter(data.source, data.sourceHref, data.song, data.artist, data.album, data.duration);
-  } else {
+  } else if (lyrics.length > 0) {
     DOM.addNoLyricsButton(data.song, data.artist, data.album, data.duration);
   }
 

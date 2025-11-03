@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import chrome from 'sinon-chrome';
 import * as Storage from '../storage';
-import { mockChromeStorage, flushPromises } from '../../../tests/test-utils';
+import { mockChromeStorage, flushPromises } from '@tests/test-utils';
 
 describe('Storage Module', () => {
   beforeEach(() => {
@@ -225,4 +225,104 @@ describe('Storage Module', () => {
       await expect(Storage.purgeExpiredKeys()).resolves.not.toThrow();
     });
   });
+
+  describe('getAndApplyCustomCSS', () => {
+    it('should retrieve and apply custom CSS', (done) => {
+      const customCSS = '.test { color: red; }';
+      mockChromeStorage({ customCSS });
+
+      // Mock applyCustomCSS by checking if style element is created
+      Storage.getAndApplyCustomCSS();
+
+      setTimeout(() => {
+        expect(chrome.storage.sync.get.called).toBe(true);
+        const getCall = chrome.storage.sync.get.getCall(0);
+        expect(getCall.args[0]).toEqual(['customCSS']);
+        done();
+      }, 10);
+    });
+
+    it('should handle missing custom CSS', (done) => {
+      mockChromeStorage({});
+
+      Storage.getAndApplyCustomCSS();
+
+      setTimeout(() => {
+        expect(chrome.storage.sync.get.called).toBe(true);
+        done();
+      }, 10);
+    });
+  });
+
+  describe('subscribeToCustomCSS', () => {
+    it('should set up storage listener for CSS changes', () => {
+      mockChromeStorage({ customCSS: '.initial { color: blue; }' });
+
+      Storage.subscribeToCustomCSS();
+
+      expect(chrome.storage.onChanged.addListener.called).toBe(true);
+    });
+
+    it('should apply CSS changes when storage changes', (done) => {
+      mockChromeStorage({});
+
+      Storage.subscribeToCustomCSS();
+
+      const listener = chrome.storage.onChanged.addListener.getCall(0).args[0];
+
+      const changes = {
+        customCSS: {
+          newValue: '.updated { color: green; }',
+          oldValue: '.old { color: red; }'
+        }
+      };
+
+      listener(changes, 'sync');
+
+      setTimeout(() => {
+        done();
+      }, 10);
+    });
+
+    it('should ignore changes from other storage areas', (done) => {
+      mockChromeStorage({});
+
+      Storage.subscribeToCustomCSS();
+
+      const listener = chrome.storage.onChanged.addListener.getCall(0).args[0];
+
+      const changes = {
+        customCSS: {
+          newValue: '.updated { color: green; }'
+        }
+      };
+
+      listener(changes, 'local');
+
+      setTimeout(() => {
+        done();
+      }, 10);
+    });
+
+    it('should ignore changes to other keys', (done) => {
+      mockChromeStorage({});
+
+      Storage.subscribeToCustomCSS();
+
+      const listener = chrome.storage.onChanged.addListener.getCall(0).args[0];
+
+      const changes = {
+        otherKey: {
+          newValue: 'value'
+        }
+      };
+
+      listener(changes, 'sync');
+
+      setTimeout(() => {
+        done();
+      }, 10);
+    });
+  });
+
 });

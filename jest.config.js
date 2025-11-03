@@ -14,7 +14,8 @@ export default {
     '^@constants$': '<rootDir>/src/core/constants',
     '^@utils$': '<rootDir>/src/core/utils',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
-    '^@options$': '<rootDir>/src/options'
+    '^@options$': '<rootDir>/src/options',
+    '^@tests/(.*)$': '<rootDir>/tests/$1'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
