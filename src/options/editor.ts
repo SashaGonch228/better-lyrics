@@ -17,6 +17,7 @@ import { highlightSelectionMatches } from "@codemirror/search";
 import { EditorState } from "@codemirror/state";
 import {
   crosshairCursor,
+  Decoration,
   drawSelection,
   EditorView,
   highlightActiveLine,
@@ -26,6 +27,7 @@ import {
   lineNumbers,
   rectangularSelection,
   tooltips,
+  ViewPlugin,
 } from "@codemirror/view";
 import { materialDark } from "@fsegurai/codemirror-theme-material-dark";
 import THEMES, { deleteCustomTheme, getCustomThemes, renameCustomTheme, saveCustomTheme } from "./themes";
@@ -394,6 +396,95 @@ const cssLinter = linter(async view => {
 });
 
 // ============================================================================
+// RAINBOW BRACKETS
+// Originally from https://github.com/eriknewland/rainbowbrackets/blob/main/rainbowBrackets.js, modified to fit our use case
+// ============================================================================
+
+const rainbowBracketsPlugin = ViewPlugin.fromClass(
+  class {
+    decorations;
+
+    constructor(view: EditorView) {
+      this.decorations = this.getBracketDecorations(view);
+    }
+
+    update(update: any) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = this.getBracketDecorations(update.view);
+      }
+    }
+
+    getBracketDecorations(view: EditorView) {
+      const { doc } = view.state;
+      const decorations = [];
+      const stack: Array<{
+        type: string;
+        from: number;
+      }> = [];
+      const colors = ["red", "orange", "yellow", "green", "blue", "indigo", "violet"];
+
+      for (let pos = 0; pos < doc.length; pos += 1) {
+        const char = doc.sliceString(pos, pos + 1);
+        if (char === "(" || char === "[" || char === "{") {
+          stack.push({ type: char, from: pos });
+        } else if (char === ")" || char === "]" || char === "}") {
+          const open = stack.pop();
+          if (open && open.type === this.getMatchingBracket(char)) {
+            const color = colors[stack.length % colors.length];
+            decorations.push(
+              Decoration.mark({ class: `rainbow-bracket-${color}` }).range(open.from, open.from + 1),
+              Decoration.mark({ class: `rainbow-bracket-${color}` }).range(pos, pos + 1)
+            );
+          }
+        }
+      }
+
+      decorations.sort((a, b) => a.from - b.from);
+
+      return Decoration.set(decorations);
+    }
+
+    getMatchingBracket(closingBracket: ")" | "]" | "}"): string | null {
+      switch (closingBracket) {
+        case ")":
+          return "(";
+        case "]":
+          return "[";
+        case "}":
+          return "{";
+        default:
+          return null;
+      }
+    }
+  },
+  {
+    decorations: v => v.decorations,
+  }
+);
+
+function rainbowBrackets() {
+  return [
+    rainbowBracketsPlugin,
+    EditorView.baseTheme({
+      ".rainbow-bracket-red": { color: "#7186f0" },
+      ".rainbow-bracket-red > span": { color: "#7186f0" },
+      ".rainbow-bracket-orange": { color: "#56c8d8" },
+      ".rainbow-bracket-orange > span": { color: "#56c8d8" },
+      ".rainbow-bracket-yellow": { color: "#cf6edf" },
+      ".rainbow-bracket-yellow > span": { color: "#cf6edf" },
+      ".rainbow-bracket-green": { color: "#6abf69" },
+      ".rainbow-bracket-green > span": { color: "#6abf69" },
+      ".rainbow-bracket-blue": { color: "#ffad42" },
+      ".rainbow-bracket-blue > span": { color: "#ffad42" },
+      ".rainbow-bracket-indigo": { color: "#ff6e40" },
+      ".rainbow-bracket-indigo > span": { color: "#ff6e40" },
+      ".rainbow-bracket-violet": { color: "#ff5f52" },
+      ".rainbow-bracket-violet > span": { color: "#ff5f52" },
+    }),
+  ];
+}
+
+// ============================================================================
 // EDITOR INITIALIZATION
 // ============================================================================
 
@@ -430,6 +521,7 @@ function createEditorState(initialContents: string) {
     cssLinter,
     tooltips(),
     materialDark,
+    rainbowBrackets(),
     EditorView.updateListener.of(update => {
       let text = update.state.doc.toString();
       if (update.docChanged && !text.startsWith("Loading")) {
