@@ -1,4 +1,4 @@
-import type {Config} from "stylelint"
+import type { Config } from "stylelint";
 import blyricsVariableAllowlist from "@/options/editor/blyrics-variable-allowlist";
 
 export const SAVE_DEBOUNCE_DELAY = 1000;
@@ -7,7 +7,7 @@ export const SYNC_STORAGE_LIMIT = 7000;
 export const MAX_RETRY_ATTEMPTS = 3;
 export const BRACKET_NESTING_LEVELS = 7;
 
-export const stylelintConfig: Config  = {
+export const stylelintConfig: Config = {
   rules: {
     "annotation-no-unknown": true,
     "at-rule-no-unknown": true,
