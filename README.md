@@ -107,8 +107,8 @@ Custom styling for lyrics is available from Better Lyrics v1.7.0 onwards. This a
 
 ## Extension Permissions
 
-| Permission                                                            | Reason                                                                                                                                                                                       | Data Usage                                         |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Permission                                                            | Reason                                                                                                                                                                                           | Data Usage                                         |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
 | **Download files and read and modify the browser's download history** | [Firefox specific - Required to download styles and themes as CSS file](https://github.com/better-lyrics/better-lyrics/blob/b9d5f888703f1b786e48a4fe66bfec08a1553739/src/options/editor.js#L159) | Does not read or modify browser's download history |
 
 Better Lyrics **does not** collect any personal data or track your browsing activity. The extension is open-source and thoroughly reviewed by the community to ensure that your privacy is protected.
@@ -230,7 +230,7 @@ No, Better Lyrics is specifically designed for YouTube Music. If you want someth
 >
 > Your support helps cover the costs of hosting and development, and ensures continued improvements and stability.
 
-<a href="https://drips.network/app/projects/github/better-lyrics/better-lyrics" target="_blank"><img src="https://www.drips.network/api/embed/project/https%3A%2F%2Fgithub.com%2Fbetter-lyrics%2Fbetter-lyrics/support.png?background=light&style=drips&text=project&stat=support" alt="Support better-lyrics on drips.network" height="32"></a>
+<a href="https://optimism.drips.network/app/projects/github/better-lyrics/better-lyrics" target="_blank"><img src="https://optimism.drips.network/api/embed/project/https%3A%2F%2Fgithub.com%2Fbetter-lyrics%2Fbetter-lyrics/support.png?background=dark&style=drips&text=project&stat=support" alt="Support better-lyrics on drips.network" height="32"></a>
 
 [![Github Sponsors](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23F20C33)](https://github.com/sponsors/boidushya)
 
