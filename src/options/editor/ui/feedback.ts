@@ -1,4 +1,4 @@
-import type { ModalOptions } from "./types";
+import type { ModalOptions } from "../types";
 import {
   modalCancelBtn,
   modalCloseBtn,
@@ -8,6 +8,19 @@ import {
   modalOverlay,
   modalTitle,
 } from "./dom";
+
+export const showAlert = (message: string): void => {
+  const status = document.getElementById("status-css")!;
+  status.innerText = message;
+  status.classList.add("active");
+
+  setTimeout(() => {
+    status.classList.remove("active");
+    setTimeout(() => {
+      status.innerText = "";
+    }, 200);
+  }, 2000);
+};
 
 export function showModal(options: ModalOptions): Promise<string | null> {
   return new Promise(resolve => {

@@ -14,3 +14,26 @@ export const themeSelectorBtn = document.getElementById("theme-selector-btn") as
 export const themeModalOverlay = document.getElementById("theme-modal-overlay") as HTMLElement | null;
 export const themeModalClose = document.getElementById("theme-modal-close") as HTMLButtonElement | null;
 export const themeModalGrid = document.getElementById("theme-modal-grid") as HTMLElement | null;
+
+export const openEditCSS = (): void => {
+  const editCSS = document.getElementById("css");
+  const options = document.getElementById("options");
+  const themeContent = document.getElementById("themes-content");
+  if (editCSS && themeContent && options) {
+    editCSS.style.display = "block";
+    options.style.display = "none";
+    themeContent.style.display = "none";
+  }
+};
+
+export const openOptions = (): void => {
+  const editCSS = document.getElementById("css");
+  const options = document.getElementById("options");
+  const themeContent = document.getElementById("themes-content");
+
+  if (editCSS && themeContent && options) {
+    editCSS.style.display = "";
+    options.style.display = "";
+    themeContent.style.display = "";
+  }
+};
