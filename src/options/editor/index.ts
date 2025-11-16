@@ -1,4 +1,4 @@
-import { showAlert } from "./alerts";
+import { showAlert } from "./ui/feedback";
 import {
   deleteThemeBtn,
   editThemeBtn,
@@ -6,12 +6,13 @@ import {
   themeModalOverlay,
   themeSelectorBtn,
   themeNameText,
-} from "./dom";
-import { createEditorState, createEditorView } from "./core";
-import { generateDefaultFilename, loadCSSFromFile, saveCSSToFile } from "./file-operations";
-import { openEditCSS, openOptions } from "./navigation";
-import { decrementSaveCount, getSaveCount, setCurrentThemeName, setEditor, setIsUserTyping } from "./state";
-import { loadCustomCSS } from "./storage";
+  openEditCSS,
+  openOptions,
+} from "./ui/dom";
+import { createEditorState, createEditorView } from "./core/editor";
+import { generateDefaultFilename, saveCSSToFile, importManager } from "./features/import";
+import { editorStateManager } from "./core/state";
+import { storageManager } from "./features/storage";
 import {
   closeThemeModal,
   handleDeleteTheme,
@@ -20,7 +21,7 @@ import {
   openThemeModal,
   saveToStorage,
   setThemeName,
-} from "./themes";
+} from "./features/themes";
 
 export function initializeNavigation() {
   document.getElementById("edit-css-btn")?.addEventListener("click", openEditCSS);
@@ -67,66 +68,47 @@ export function initializeFileOperations() {
     input.type = "file";
     input.accept = ".css";
     input.onchange = async (event: Event) => {
-      const file = (event.target as HTMLInputElement).files?.[0]!;
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
       try {
-        const css = await loadCSSFromFile(file);
-        const { editor } = await import("./state");
-        editor.setState(createEditorState(css as string));
-
-        setCurrentThemeName(null);
-        chrome.storage.sync.remove("themeName");
-        const { hideThemeName } = await import("./themes");
-        hideThemeName();
-
-        setIsUserTyping(false);
-        saveToStorage();
-
-        showAlert(`CSS file "${file.name}" imported!`);
+        await importManager.importCSSFile(file);
       } catch (err) {
-        console.error("Error reading CSS file:", err);
-        showAlert("Error reading CSS file! Please try again.");
+        console.error("[BetterLyrics] File import error:", err);
       }
     };
     input.click();
   });
 
   document.getElementById("file-export-btn")?.addEventListener("click", async () => {
-    const { editor } = await import("./state");
+    const editor = editorStateManager.getEditor();
+    if (!editor) {
+      showAlert("Editor not initialized!");
+      return;
+    }
+
     const css = editor.state.doc.toString();
     if (!css) {
       showAlert("No styles to export!");
       return;
     }
+
     const defaultFilename = generateDefaultFilename();
     saveCSSToFile(css, defaultFilename);
   });
 }
 
 export function initializeStorageListeners() {
-  chrome.storage.onChanged.addListener(async (changes, namespace) => {
-    console.log("storage", changes, namespace);
-    if (Object.hasOwn(changes, "customCSS")) {
-      if (getSaveCount() === 0) {
-        const css = await loadCustomCSS();
-        const { editor } = await import("./state");
-        console.log("Got a CSS Update");
-        editor.setState(createEditorState(css));
-      }
-      decrementSaveCount();
-    }
-
-    if (Object.hasOwn(changes, "themeName")) {
-      console.log("Got a Theme Name Update");
-      await setThemeName();
-    }
-  });
+  storageManager.initialize();
 }
 
 export async function initializeEditor() {
-  console.log("DOM loaded");
+  console.log("[BetterLyrics] DOM loaded, initializing editor");
+
   const editorElement = document.getElementById("editor")!;
   const initialEditor = createEditorView(createEditorState("Loading..."), editorElement);
-  setEditor(initialEditor);
+
+  editorStateManager.setEditor(initialEditor);
 
   document.getElementById("editor-popout-button")?.addEventListener("click", () => {
     chrome.tabs.create({
@@ -134,15 +116,14 @@ export async function initializeEditor() {
     });
   });
 
-  const setSelectedThemePromise = setThemeName();
+  console.log("[BetterLyrics] Loading theme name and initial CSS");
 
-  const loadCustomCssPromise = loadCustomCSS().then(async result => {
-    console.log("Loaded Custom CSS:", result);
-    const { editor } = await import("./state");
-    editor.setState(createEditorState(result));
-  });
+  const setSelectedThemePromise = setThemeName();
+  const loadCustomCssPromise = storageManager.loadInitialCSS();
 
   await Promise.allSettled([setSelectedThemePromise, loadCustomCssPromise]);
+
+  console.log("[BetterLyrics] Editor initialization complete");
 }
 
 export function initialize() {

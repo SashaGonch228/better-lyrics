@@ -11,7 +11,7 @@ export interface ModalOptions {
 
 export interface SaveResult {
   success: boolean;
-  strategy?: "local" | "sync";
+  strategy?: "local" | "sync" | "chunked";
   wasRetry?: boolean;
   error?: any;
 }

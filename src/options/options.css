@@ -831,11 +831,11 @@ hr {
 .theme-name-wrapper{
 	display: flex;
 	align-items:center;
-	gap: 0.5rem;
 }
 
 .theme-name-wrapper > svg{
-	padding: 0 0.5rem;
+	margin-left: -0.5rem;
+	padding: 0 0.75rem;
 }
 
 .theme-name-container {

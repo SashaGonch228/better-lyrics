@@ -2,6 +2,53 @@ import * as Utils from "@utils";
 import * as Constants from "@constants";
 import { cachedDurations } from "@modules/ui/animationEngine";
 
+async function decompressCSS(css: string): Promise<string> {
+  if (!css.startsWith("__COMPRESSED__")) {
+    return css;
+  }
+
+  try {
+    if (typeof DecompressionStream !== "undefined") {
+      const base64 = css.substring("__COMPRESSED__".length);
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes]);
+      const stream = blob.stream().pipeThrough(new DecompressionStream("gzip"));
+      const decompressedBlob = await new Response(stream).blob();
+      return await decompressedBlob.text();
+    }
+  } catch (error) {
+    Utils.log(Constants.GENERAL_ERROR_LOG, "Decompression failed:", error);
+  }
+  return css.substring("__COMPRESSED__".length);
+}
+
+async function loadChunkedCSS(): Promise<string | null> {
+  const metadata = await chrome.storage.local.get(["customCSS_chunked", "customCSS_chunkCount"]);
+
+  if (!metadata.customCSS_chunked || !metadata.customCSS_chunkCount) {
+    return null;
+  }
+
+  const chunkKeys = Array.from({ length: metadata.customCSS_chunkCount }, (_, i) => `customCSS_chunk_${i}`);
+  const chunksData = await chrome.storage.local.get(chunkKeys);
+
+  const chunks: string[] = [];
+  for (let i = 0; i < metadata.customCSS_chunkCount; i++) {
+    const chunk = chunksData[`customCSS_chunk_${i}`];
+    if (!chunk) {
+      Utils.log(Constants.GENERAL_ERROR_LOG, `Missing CSS chunk ${i}`);
+      return null;
+    }
+    chunks.push(chunk);
+  }
+
+  return chunks.join("");
+}
+
 /**
  * Cross-browser storage getter that works with both Chrome and Firefox.
  *
@@ -17,24 +64,87 @@ export function getStorage(
 
 /**
  * Retrieves and applies custom CSS from storage.
+ * Supports hybrid storage: checks cssStorageType to determine if CSS is in sync, local, or chunked storage.
  */
-export function getAndApplyCustomCSS(): void {
-  chrome.storage.sync.get(["customCSS"], (result: { [key: string]: any }) => {
-    if (result.customCSS) {
-      Utils.applyCustomCSS(result.customCSS);
+export async function getAndApplyCustomCSS(): Promise<void> {
+  try {
+    const syncData = await chrome.storage.sync.get(["cssStorageType", "customCSS", "cssCompressed"]);
+
+    let css: string | null = null;
+    let isCompressed = false;
+
+    if (syncData.cssStorageType === "chunked") {
+      css = await loadChunkedCSS();
+      isCompressed = syncData.cssCompressed || false;
+    } else if (syncData.cssStorageType === "local") {
+      const localData = await chrome.storage.local.get(["customCSS", "cssCompressed"]);
+      css = localData.customCSS;
+      isCompressed = localData.cssCompressed || false;
+    } else {
+      css = syncData.customCSS;
+      isCompressed = syncData.cssCompressed || false;
     }
-  });
+
+    if (css) {
+      if (isCompressed || css.startsWith("__COMPRESSED__")) {
+        css = await decompressCSS(css);
+      }
+      Utils.applyCustomCSS(css);
+    }
+  } catch (error) {
+    Utils.log(Constants.GENERAL_ERROR_LOG, error);
+    try {
+      const chunkedCSS = await loadChunkedCSS();
+      if (chunkedCSS) {
+        const syncData = await chrome.storage.sync.get("cssCompressed");
+        let css = chunkedCSS;
+        if (syncData.cssCompressed || css.startsWith("__COMPRESSED__")) {
+          css = await decompressCSS(css);
+        }
+        Utils.applyCustomCSS(css);
+        return;
+      }
+
+      const localData = await chrome.storage.local.get(["customCSS", "cssCompressed"]);
+      if (localData.customCSS) {
+        let css = localData.customCSS;
+        if (localData.cssCompressed || css.startsWith("__COMPRESSED__")) {
+          css = await decompressCSS(css);
+        }
+        Utils.applyCustomCSS(css);
+        return;
+      }
+
+      const syncData = await chrome.storage.sync.get(["customCSS", "cssCompressed"]);
+      if (syncData.customCSS) {
+        let css = syncData.customCSS;
+        if (syncData.cssCompressed || css.startsWith("__COMPRESSED__")) {
+          css = await decompressCSS(css);
+        }
+        Utils.applyCustomCSS(css);
+      }
+    } catch (fallbackError) {
+      Utils.log(Constants.GENERAL_ERROR_LOG, fallbackError);
+    }
+  }
 }
 
 /**
  * Subscribes to custom CSS changes and applies them automatically.
  * Also invalidates cached transition duration when CSS changes.
+ * Listens to both sync and local storage for hybrid storage support.
  */
 export function subscribeToCustomCSS(): void {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" && changes.customCSS) {
-      Utils.applyCustomCSS(changes.customCSS.newValue);
-      cachedDurations.clear();
+  chrome.storage.onChanged.addListener(async (changes, area) => {
+    if ((area === "sync" || area === "local") && changes.customCSS) {
+      if (changes.customCSS.newValue) {
+        let css = changes.customCSS.newValue;
+        if (css.startsWith("__COMPRESSED__")) {
+          css = await decompressCSS(css);
+        }
+        Utils.applyCustomCSS(css);
+        cachedDurations.clear();
+      }
     }
   });
   getAndApplyCustomCSS();

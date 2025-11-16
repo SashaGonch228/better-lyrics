@@ -1,8 +1,7 @@
-import type { ThemeCardOptions } from "./types";
-
-import { showAlert } from "./alerts";
-import { SAVE_CUSTOM_THEME_DEBOUNCE, SAVE_DEBOUNCE_DELAY } from "./config";
-import { createEditorState } from "./core";
+import type { ThemeCardOptions } from "../types";
+import THEMES, { deleteCustomTheme, getCustomThemes, renameCustomTheme, saveCustomTheme } from "../../themes";
+import { SAVE_CUSTOM_THEME_DEBOUNCE, SAVE_DEBOUNCE_DELAY } from "../core/editor";
+import { editorStateManager } from "../core/state";
 import {
   deleteThemeBtn,
   editThemeBtn,
@@ -12,31 +11,106 @@ import {
   themeSelectorBtn,
   themeNameDisplay,
   themeNameText,
-} from "./dom";
-import { showConfirm, showPrompt } from "./modals";
-import {
-  currentThemeName,
-  editor,
-  incrementSaveCount,
-  isCustomTheme,
-  isUserTyping,
-  saveCustomThemeTimeout,
-  saveTimeout,
-  setCurrentThemeName,
-  setIsCustomTheme,
-  setIsUserTyping,
-  setSaveCustomThemeTimeout,
-  setSaveTimeout,
-} from "./state";
+} from "../ui/dom";
+import { showAlert, showConfirm, showPrompt } from "../ui/feedback";
 import { saveToStorageWithFallback, sendUpdateMessage, showSyncError, showSyncSuccess } from "./storage";
 
-import THEMES, { deleteCustomTheme, getCustomThemes, renameCustomTheme, saveCustomTheme } from "../themes";
+export class ThemeManager {
+  async applyTheme(isCustom: boolean, index: number, themeName: string): Promise<void> {
+    console.log(`[ThemeManager] Applying ${isCustom ? "custom" : "built-in"} theme: ${themeName}`);
+
+    try {
+      if (isCustom) {
+        await this.applyCustomTheme(index);
+      } else {
+        await this.applyBuiltInTheme(index);
+      }
+    } catch (error) {
+      console.error(`[ThemeManager] Failed to apply theme:`, error);
+      showAlert("Error applying theme! Please try again.");
+      throw error;
+    }
+  }
+
+  private async applyCustomTheme(index: number): Promise<void> {
+    const customThemes = await getCustomThemes();
+    const selectedTheme = customThemes[index];
+
+    if (!selectedTheme) {
+      throw new Error(`Custom theme at index ${index} not found`);
+    }
+
+    const themeContent = `/* ${selectedTheme.name}, a custom theme for BetterLyrics */\n\n${selectedTheme.css}\n`;
+
+    await editorStateManager.queueOperation("theme", async () => {
+      console.log(`[ThemeManager] Setting custom theme: ${selectedTheme.name}`);
+
+      await editorStateManager.setEditorContent(themeContent, `custom-theme:${selectedTheme.name}`);
+
+      await chrome.storage.sync.set({ themeName: selectedTheme.name });
+      editorStateManager.setCurrentThemeName(selectedTheme.name);
+      editorStateManager.setIsCustomTheme(true);
+
+      showThemeName(selectedTheme.name, true);
+      updateThemeSelectorButton();
+
+      await this.saveTheme(themeContent);
+
+      showAlert(`Applied custom theme: ${selectedTheme.name}`);
+    });
+  }
+
+  private async applyBuiltInTheme(index: number): Promise<void> {
+    const selectedTheme = THEMES[index];
+
+    if (!selectedTheme) {
+      throw new Error(`Built-in theme at index ${index} not found`);
+    }
+
+    const response = await fetch(chrome.runtime.getURL(`css/themes/${selectedTheme.path}`));
+    const css = await response.text();
+
+    const themeContent = `/* ${selectedTheme.name}, a theme for BetterLyrics by ${selectedTheme.author} ${selectedTheme.link && `(${selectedTheme.link})`} */\n\n${css}\n`;
+
+    await editorStateManager.queueOperation("theme", async () => {
+      console.log(`[ThemeManager] Setting built-in theme: ${selectedTheme.name}`);
+
+      await editorStateManager.setEditorContent(themeContent, `builtin-theme:${selectedTheme.name}`);
+
+      await chrome.storage.sync.set({ themeName: selectedTheme.name });
+      editorStateManager.setCurrentThemeName(selectedTheme.name);
+      editorStateManager.setIsCustomTheme(false);
+
+      showThemeName(selectedTheme.name, false);
+      updateThemeSelectorButton();
+
+      await this.saveTheme(themeContent);
+
+      showAlert(`Applied theme: ${selectedTheme.name}`);
+    });
+  }
+
+  private async saveTheme(css: string): Promise<void> {
+    editorStateManager.incrementSaveCount();
+
+    const result = await saveToStorageWithFallback(css, true);
+
+    if (!result.success || !result.strategy) {
+      throw new Error(`Failed to save theme: ${result.error?.message || "Unknown error"}`);
+    }
+
+    showSyncSuccess(result.strategy, result.wasRetry);
+    await sendUpdateMessage(css, result.strategy);
+  }
+}
+
+export const themeManager = new ThemeManager();
 
 export function showThemeName(themeName: string, custom: boolean = false): void {
   if (themeNameDisplay && themeNameText) {
     themeNameText.textContent = themeName;
     themeNameDisplay.classList.add("active");
-    setIsCustomTheme(custom);
+    editorStateManager.setIsCustomTheme(custom);
 
     if (editThemeBtn) {
       if (custom) {
@@ -66,33 +140,43 @@ export function hideThemeName(): void {
   if (deleteThemeBtn) {
     deleteThemeBtn.classList.remove("active");
   }
-  setIsCustomTheme(false);
+  editorStateManager.setIsCustomTheme(false);
 }
 
 export function onChange(_state: string) {
-  setIsUserTyping(true);
-  if (currentThemeName !== null && !isCustomTheme) {
-    setCurrentThemeName(null);
+  editorStateManager.setIsUserTyping(true);
+
+  const themeName = editorStateManager.getCurrentThemeName();
+  const isCustom = editorStateManager.getIsCustomTheme();
+
+  if (themeName !== null && !isCustom) {
+    editorStateManager.setCurrentThemeName(null);
     chrome.storage.sync.remove("themeName");
     hideThemeName();
     updateThemeSelectorButton();
-  } else if (isCustomTheme && currentThemeName) {
+  } else if (isCustom && themeName) {
     debounceSaveCustomTheme();
   }
   debounceSave();
 }
 
 function debounceSaveCustomTheme() {
-  clearTimeout(saveCustomThemeTimeout);
-  setSaveCustomThemeTimeout(
+  editorStateManager.clearSaveCustomThemeTimeout();
+  editorStateManager.setSaveCustomThemeTimeout(
     window.setTimeout(async () => {
-      if (currentThemeName && isCustomTheme) {
-        const css = editor.state.doc.toString();
+      const themeName = editorStateManager.getCurrentThemeName();
+      const isCustom = editorStateManager.getIsCustomTheme();
+
+      if (themeName && isCustom) {
+        const currentEditor = editorStateManager.getEditor();
+        if (!currentEditor) return;
+
+        const css = currentEditor.state.doc.toString();
         const cleanCss = css.replace(/^\/\*.*?\*\/\n\n/s, "").trim();
 
         try {
-          await saveCustomTheme(currentThemeName, cleanCss);
-          console.log(`Auto-saved custom theme: ${currentThemeName}`);
+          await saveCustomTheme(themeName, cleanCss);
+          console.log(`Auto-saved custom theme: ${themeName}`);
         } catch (error) {
           console.error("Error auto-saving custom theme:", error);
         }
@@ -103,17 +187,24 @@ function debounceSaveCustomTheme() {
 
 function debounceSave() {
   syncIndicator.style.display = "block";
-  clearTimeout(saveTimeout);
-  setSaveTimeout(window.setTimeout(saveToStorage, SAVE_DEBOUNCE_DELAY));
+  editorStateManager.clearSaveTimeout();
+  editorStateManager.setSaveTimeout(window.setTimeout(saveToStorage, SAVE_DEBOUNCE_DELAY));
 }
 
 export function saveToStorage(isTheme = false) {
-  incrementSaveCount();
-  const css = editor.state.doc.toString();
+  const currentEditor = editorStateManager.getEditor();
+  if (!currentEditor) {
+    console.error("[BetterLyrics] Cannot save: editor not initialized");
+    return;
+  }
 
-  if (!isTheme && isUserTyping && !isCustomTheme) {
+  editorStateManager.incrementSaveCount();
+  const css = currentEditor.state.doc.toString();
+
+  const isCustom = editorStateManager.getIsCustomTheme();
+  if (!isTheme && editorStateManager.getIsUserTyping() && !isCustom) {
     chrome.storage.sync.remove("themeName");
-    setCurrentThemeName(null);
+    editorStateManager.setCurrentThemeName(null);
   }
 
   saveToStorageWithFallback(css, isTheme)
@@ -130,13 +221,14 @@ export function saveToStorage(isTheme = false) {
       showSyncError(err);
     });
 
-  setIsUserTyping(false);
+  editorStateManager.setIsUserTyping(false);
 }
 
 export function updateThemeSelectorButton() {
   if (themeSelectorBtn) {
-    if (currentThemeName) {
-      themeSelectorBtn.textContent = currentThemeName;
+    const themeName = editorStateManager.getCurrentThemeName();
+    if (themeName) {
+      themeSelectorBtn.textContent = themeName;
     } else {
       themeSelectorBtn.textContent = "Choose a theme";
     }
@@ -197,7 +289,7 @@ function createThemeCard(options: ThemeCardOptions): HTMLElement {
   const card = document.createElement("div");
   card.className = "theme-card";
 
-  if (currentThemeName === options.name) {
+  if (editorStateManager.getCurrentThemeName() === options.name) {
     card.classList.add("selected");
   }
 
@@ -226,40 +318,11 @@ function createThemeCard(options: ThemeCardOptions): HTMLElement {
   return card;
 }
 
-async function selectTheme(isCustom: boolean, index: number, _themeName: string) {
-  if (isCustom) {
-    const customThemes = await getCustomThemes();
-    const selectedTheme = customThemes[index];
-    if (selectedTheme) {
-      const themeContent = `/* ${selectedTheme.name}, a custom theme for BetterLyrics */\n\n${selectedTheme.css}\n`;
-      editor.setState(createEditorState(themeContent));
-
-      chrome.storage.sync.set({ themeName: selectedTheme.name });
-      setCurrentThemeName(selectedTheme.name);
-      setIsUserTyping(false);
-      saveToStorage(true);
-      showThemeName(selectedTheme.name, true);
-      updateThemeSelectorButton();
-      showAlert(`Applied custom theme: ${selectedTheme.name}`);
-    }
-  } else {
-    const selectedTheme = THEMES[index];
-    if (selectedTheme) {
-      fetch(chrome.runtime.getURL(`css/themes/${selectedTheme.path}`))
-        .then(response => response.text())
-        .then(css => {
-          const themeContent = `/* ${selectedTheme.name}, a theme for BetterLyrics by ${selectedTheme.author} ${selectedTheme.link && `(${selectedTheme.link})`} */\n\n${css}\n`;
-          editor.setState(createEditorState(themeContent));
-
-          chrome.storage.sync.set({ themeName: selectedTheme.name });
-          setCurrentThemeName(selectedTheme.name);
-          setIsUserTyping(false);
-          saveToStorage(true);
-          showThemeName(selectedTheme.name, false);
-          updateThemeSelectorButton();
-          showAlert(`Applied theme: ${selectedTheme.name}`);
-        });
-    }
+async function selectTheme(isCustom: boolean, index: number, themeName: string) {
+  try {
+    await themeManager.applyTheme(isCustom, index, themeName);
+  } catch (error) {
+    console.error("[BetterLyrics] Error selecting theme:", error);
   }
 }
 
@@ -299,19 +362,25 @@ export async function setThemeName() {
     if (syncData.themeName) {
       const builtInIndex = THEMES.findIndex(theme => theme.name === syncData.themeName);
       if (builtInIndex !== -1) {
-        setCurrentThemeName(syncData.themeName);
+        editorStateManager.setCurrentThemeName(syncData.themeName);
+        editorStateManager.setIsCustomTheme(false);
         showThemeName(syncData.themeName, false);
       } else {
         const customThemes = await getCustomThemes();
         const customIndex = customThemes.findIndex(theme => theme.name === syncData.themeName);
         if (customIndex !== -1) {
-          setCurrentThemeName(syncData.themeName);
+          editorStateManager.setCurrentThemeName(syncData.themeName);
+          editorStateManager.setIsCustomTheme(true);
           showThemeName(syncData.themeName, true);
         } else {
+          editorStateManager.setCurrentThemeName(null);
+          editorStateManager.setIsCustomTheme(false);
           hideThemeName();
         }
       }
     } else {
+      editorStateManager.setCurrentThemeName(null);
+      editorStateManager.setIsCustomTheme(false);
       hideThemeName();
     }
     updateThemeSelectorButton();
@@ -319,7 +388,13 @@ export async function setThemeName() {
 }
 
 export async function handleSaveTheme() {
-  const css = editor.state.doc.toString();
+  const currentEditor = editorStateManager.getEditor();
+  if (!currentEditor) {
+    showAlert("Editor not initialized!");
+    return;
+  }
+
+  const css = currentEditor.state.doc.toString();
   if (!css || css.trim() === "") {
     showAlert("No CSS to save as theme!");
     return;
@@ -336,7 +411,8 @@ export async function handleSaveTheme() {
     await saveCustomTheme(themeName.trim(), cleanCss);
 
     chrome.storage.sync.set({ themeName: themeName.trim() });
-    setCurrentThemeName(themeName.trim());
+    editorStateManager.setCurrentThemeName(themeName.trim());
+    editorStateManager.setIsCustomTheme(true);
 
     showThemeName(themeName.trim(), true);
     updateThemeSelectorButton();
@@ -348,17 +424,20 @@ export async function handleSaveTheme() {
 }
 
 export async function handleRenameTheme() {
-  if (!currentThemeName || !isCustomTheme) return;
+  const themeName = editorStateManager.getCurrentThemeName();
+  const isCustom = editorStateManager.getIsCustomTheme();
 
-  const newName = await showPrompt("Rename Theme", "Enter a new name for this theme:", currentThemeName, "Theme name");
-  if (!newName || newName.trim() === "" || newName.trim() === currentThemeName) {
+  if (!themeName || !isCustom) return;
+
+  const newName = await showPrompt("Rename Theme", "Enter a new name for this theme:", themeName, "Theme name");
+  if (!newName || newName.trim() === "" || newName.trim() === themeName) {
     return;
   }
 
   try {
-    await renameCustomTheme(currentThemeName, newName.trim());
+    await renameCustomTheme(themeName, newName.trim());
 
-    setCurrentThemeName(newName.trim());
+    editorStateManager.setCurrentThemeName(newName.trim());
     chrome.storage.sync.set({ themeName: newName.trim() });
 
     showThemeName(newName.trim(), true);
@@ -372,20 +451,24 @@ export async function handleRenameTheme() {
 }
 
 export async function handleDeleteTheme() {
-  if (!currentThemeName || !isCustomTheme) return;
+  const themeName = editorStateManager.getCurrentThemeName();
+  const isCustom = editorStateManager.getIsCustomTheme();
+
+  if (!themeName || !isCustom) return;
 
   const confirmed = await showConfirm(
     "Delete Theme",
-    `Are you sure you want to delete the theme <code>${currentThemeName}</code>?`,
+    `Are you sure you want to delete the theme <code>${themeName}</code>?`,
     true
   );
   if (!confirmed) return;
 
   try {
-    await deleteCustomTheme(currentThemeName);
+    await deleteCustomTheme(themeName);
 
     chrome.storage.sync.remove("themeName");
-    setCurrentThemeName(null);
+    editorStateManager.setCurrentThemeName(null);
+    editorStateManager.setIsCustomTheme(false);
 
     hideThemeName();
     updateThemeSelectorButton();
