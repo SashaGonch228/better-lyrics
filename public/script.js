@@ -9,6 +9,18 @@
  */
 let tickLyricsInterval;
 
+/**
+ * Last recorded player time to detect changes.
+ * @type {number}
+ */
+let lastPlayerTime = 0;
+
+/**
+ * Last recorded player timestamp to interpolate time.
+ * @type {number}
+ */
+let lastPlayerTimestamp = 0;
+
 // Get all player methods (paste in broswer console)
 // for(i in document.getElementById("movie_player")) {
 //     if (typeof document.getElementById("movie_player")[i] === 'function' && i.includes("get")) {
@@ -29,22 +41,36 @@ const startLyricsTick = () => {
     const player = document.getElementById("movie_player");
     if (player) {
       try {
-        const currentTime = player.getCurrentTime();
+        const now = Date.now();
+
         const { video_id, title, author } = player.getVideoData();
         const audioTrackData = player.getAudioTrack();
         const duration = player.getDuration();
         const { isPlaying, isBuffering } = player.getPlayerStateObject();
         const contentRect = player.getVideoContentRect();
+
+        const currentTime = player.getCurrentTime();
+
+        // Extrapolate the current time
+        if (currentTime !== lastPlayerTime || !isPlaying) {
+          lastPlayerTime = currentTime;
+          lastPlayerTimestamp = now;
+        }
+
+        const timeDiff = (now - lastPlayerTimestamp) / 1000;
+
+        const time = currentTime + timeDiff;
+
         document.dispatchEvent(
           new CustomEvent("blyrics-send-player-time", {
             detail: {
-              currentTime: currentTime,
+              currentTime: time,
               videoId: video_id,
               song: title,
               artist: author,
               duration: duration,
               audioTrackData: audioTrackData,
-              browserTime: Date.now(),
+              browserTime: now,
               playing: isPlaying && !isBuffering,
               contentRect,
             },
