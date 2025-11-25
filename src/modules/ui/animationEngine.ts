@@ -2,6 +2,7 @@ import { AppState } from "@/index";
 import * as Constants from "@constants";
 import * as Utils from "@utils";
 import { isLoaderActive } from "@modules/ui/dom";
+import { calculateLyricPositions, type LineData } from "@modules/lyrics/injectLyrics";
 
 const MIRCO_SCROLL_THRESHOLD_S = 0.3;
 
@@ -17,6 +18,10 @@ interface AnimEngineState {
   lastPlayState: boolean;
   lastEventCreationTime: number;
   lastFirstActiveElement: number;
+  /**
+   * Track if this is the first new tick to avoid rescrolls when opening the lyrics
+   */
+  doneFirstInstantScroll: boolean;
 }
 
 export let animEngineState: AnimEngineState = {
@@ -31,6 +36,7 @@ export let animEngineState: AnimEngineState = {
   lastPlayState: false,
   lastEventCreationTime: 0,
   lastFirstActiveElement: -1,
+  doneFirstInstantScroll: true,
 };
 
 /**
@@ -65,12 +71,7 @@ export function getCSSDurationInMs(lyricsElement: HTMLElement, property: string)
  * @param [isPlaying=true] - Whether audio is currently playing
  * @param [smoothScroll=true] - Whether to use smooth scrolling
  */
-export function animationEngine(
-  currentTime: number,
-  eventCreationTime: number,
-  isPlaying = true,
-  smoothScroll = true
-): void | boolean {
+export function animationEngine(currentTime: number, eventCreationTime: number, isPlaying = true, smoothScroll = true) {
   const now = Date.now();
   if (isLoaderActive() || !AppState.areLyricsTicking || (currentTime === 0 && !isPlaying)) {
     return;
@@ -97,6 +98,7 @@ export function animationEngine(
     playerState === "MINIPLAYER_IN_PLAYER_PAGE";
   // Don't tick lyrics if they're not visible
   if (tabSelector.getAttribute("aria-selected") !== "true" || !isPlayerOpen) {
+    animEngineState.doneFirstInstantScroll = false;
     return;
   }
 
@@ -125,11 +127,10 @@ export function animationEngine(
     }
 
     const lyricScrollTime = currentTime + getCSSDurationInMs(lyricsElement, "--blyrics-scroll-timing-offset") / 1000;
-    let firstActiveScrollPos = -1;
-
-    let selectedLyricHeight = 0;
-    let targetScrollPos = 0;
+    let firstActiveElem: LineData | null = null;
+    let selectedLyric: LineData = lines[0];
     let availableScrollTime = 999;
+
     lines.every((lineData: any, index: number) => {
       const time = lineData.time;
       let nextTime = Infinity;
@@ -139,10 +140,7 @@ export function animationEngine(
       }
 
       if (lyricScrollTime >= time && (lyricScrollTime < nextTime || lyricScrollTime < time + lineData.duration)) {
-        const elemBounds = getRelativeBounds(lyricsElement, lineData.lyricElement);
-
-        targetScrollPos = elemBounds.y;
-        selectedLyricHeight = elemBounds.height;
+        selectedLyric = lineData;
         availableScrollTime = nextTime - lyricScrollTime;
 
         // Avoid micro scrolls when the previous element ends just slightly after the next elm starts.
@@ -151,10 +149,10 @@ export function animationEngine(
           lyricScrollTime < time + lineData.duration - MIRCO_SCROLL_THRESHOLD_S;
 
         if (
-          firstActiveScrollPos <= 0 &&
+          firstActiveElem == null &&
           (significantTimeRemainingInLyric || animEngineState.lastFirstActiveElement === index)
         ) {
-          firstActiveScrollPos = elemBounds.y;
+          firstActiveElem = lineData;
           animEngineState.lastFirstActiveElement = index;
         }
 
@@ -273,30 +271,38 @@ export function animationEngine(
         animEngineState.wasUserScrolling = false;
       }
 
-      if (firstActiveScrollPos <= 0) {
+      if (firstActiveElem == null) {
         // Was not set, don't scroll to the top b/c of this
-        firstActiveScrollPos = targetScrollPos;
+        firstActiveElem = selectedLyric;
       }
 
       // Offset so lyrics appear towards the center of the screen.
       // We subtract selectedLyricHeight / 2 to center the selected lyric line vertically within the offset region,
       // so the lyric is not aligned at the very top of the offset but is visually centered.
-      const scrollPosOffset = tabRendererHeight * topOffsetMultiplier - selectedLyricHeight / 2;
+      const scrollPosOffset = tabRendererHeight * topOffsetMultiplier - selectedLyric.height / 2;
 
       // Base position
-      let scrollPos = targetScrollPos - scrollPosOffset;
+      let scrollPos = selectedLyric.position - scrollPosOffset;
 
       // Make sure the first selected line is stays visible
-      scrollPos = Math.min(scrollPos, firstActiveScrollPos);
+      scrollPos = Math.min(scrollPos, firstActiveElem.position);
 
       // Make sure bottom of last active lyric is visible
-      scrollPos = Math.max(scrollPos, targetScrollPos - tabRendererHeight + selectedLyricHeight);
+      scrollPos = Math.max(scrollPos, selectedLyric.position - tabRendererHeight + selectedLyric.height);
 
       // Make sure top of last active lyric is visible.
-      scrollPos = Math.min(scrollPos, targetScrollPos);
+      scrollPos = Math.min(scrollPos, selectedLyric.position);
 
       // Make sure we're not trying to scroll to negative values
       scrollPos = Math.max(0, scrollPos);
+
+      if (scrollTop === 0 && !animEngineState.doneFirstInstantScroll) {
+        // For some reason when the panel is opened our pos is set to zero. This instant scrolls to the correct position
+        // to avoid always scrolling from the top when the panel is opened.
+        smoothScroll = false;
+        animEngineState.doneFirstInstantScroll = true;
+        animEngineState.nextScrollAllowedTime = 0;
+      }
 
       if (Math.abs(scrollTop - scrollPos) > 2 && Date.now() > animEngineState.nextScrollAllowedTime) {
         if (smoothScroll) {
@@ -362,7 +368,6 @@ export function animationEngine(
     if (!(err as Error).message?.includes("undefined")) {
       Utils.log(Constants.LYRICS_CHECK_INTERVAL_ERROR, err);
     }
-    return true;
   }
 }
 
@@ -373,6 +378,7 @@ export function lyricsElementAdded(): void {
   if (!AppState.areLyricsTicking) {
     return;
   }
+  calculateLyricPositions();
   animationEngine(
     animEngineState.lastTime,
     animEngineState.lastEventCreationTime,
@@ -406,19 +412,6 @@ export function getResumeScrollElement(): HTMLElement {
     wrapper.appendChild(elem);
   }
   return elem as HTMLElement;
-}
-
-/**
- * Returns the position and dimensions of a child element relative to its parent.
- *
- * @param parent - The parent element
- * @param child - The child element
- * @returns Rectangle with relative position and dimensions
- */
-function getRelativeBounds(parent: Element, child: Element): DOMRect {
-  const parentBound = parent.getBoundingClientRect();
-  const childBound = child.getBoundingClientRect();
-  return new DOMRect(childBound.x - parentBound.x, childBound.y - parentBound.y, childBound.width, childBound.height);
 }
 
 /**

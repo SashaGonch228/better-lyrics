@@ -83,7 +83,18 @@ export function lyricReloader(): void {
         const tabRenderer = document.querySelector(Constants.TAB_RENDERER_SELECTOR) as HTMLElement;
         scrollPositions[currentTab] = tabRenderer.scrollTop;
         tabRenderer.scrollTop = scrollPositions[i];
+        setTimeout(() => {
+          tabRenderer.scrollTop = scrollPositions[i];
+          // Don't start ticking until we set the height
+          BetterLyrics.AppState.areLyricsTicking =
+            BetterLyrics.AppState.areLyricsLoaded && BetterLyrics.AppState.lyricData?.syncType !== "none" && i === 1;
+        }, 0);
         currentTab = i;
+
+        if (i !== 1) {
+          // stop ticking immediately
+          BetterLyrics.AppState.areLyricsTicking = false;
+        }
       });
     }
 
@@ -97,9 +108,12 @@ export function lyricReloader(): void {
       }
     });
 
-    const hideAutoscrollResume = () => getResumeScrollElement().classList.add("blyrics-hidden");
-    tab1.addEventListener("click", hideAutoscrollResume);
-    tab3.addEventListener("click", hideAutoscrollResume);
+    const onNonLyricTabClick = () => {
+      getResumeScrollElement().classList.add("blyrics-hidden");
+    };
+
+    tab1.addEventListener("click", onNonLyricTabClick);
+    tab3.addEventListener("click", onNonLyricTabClick);
   } else {
     setTimeout(() => lyricReloader(), 1000);
   }
