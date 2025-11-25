@@ -1,5 +1,4 @@
 import type { EditorView } from "@codemirror/view";
-import { createEditorState } from "./editor";
 
 type OperationType = "import" | "theme" | "storage" | "init";
 
@@ -124,7 +123,7 @@ export class EditorStateManager {
   }
 
   async queueOperation(type: OperationType, execute: () => Promise<void>): Promise<void> {
-    const id = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     console.log(`[EditorStateManager] Queuing operation: ${type} (${id})`);
 
     return new Promise((resolve, reject) => {
@@ -150,10 +149,22 @@ export class EditorStateManager {
       throw new Error("[EditorStateManager] Editor not initialized");
     }
 
+    const currentContent = this.editor.state.doc.toString();
+
+    if (currentContent === css) {
+      console.log(`[EditorStateManager] Content unchanged from: ${source}, skipping update`);
+      return;
+    }
+
     console.log(`[EditorStateManager] Setting editor content from: ${source} (${css.length} bytes)`);
 
-    const newState = createEditorState(css);
-    this.editor.setState(newState);
+    this.editor.dispatch({
+      changes: {
+        from: 0,
+        to: this.editor.state.doc.length,
+        insert: css
+      },
+    });
 
     console.log(`[EditorStateManager] Editor content set successfully from: ${source}`);
   }
