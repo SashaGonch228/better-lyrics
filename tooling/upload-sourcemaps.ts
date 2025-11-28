@@ -1,25 +1,25 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import fs from 'fs';
-import path from 'path';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "fs";
+import path from "path";
 
 const browser = process.argv[2];
 if (!browser) {
-  console.error('Browser argument is missing.');
+  console.error("Browser argument is missing.");
   process.exit(1);
 }
 
-const BUCKET_NAME = 'blyrics-sourcemaps';
+const BUCKET_NAME = "blyrics-sourcemaps";
 const R2_ENDPOINT = process.env.R2_ENDPOINT;
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
 
 if (!R2_ENDPOINT || !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-  console.error('Missing required environment variables for R2 upload.');
+  console.error("Missing required environment variables for R2 upload.");
   process.exit(1);
 }
 
 const s3Client = new S3Client({
-  region: 'auto',
+  region: "auto",
   endpoint: R2_ENDPOINT,
   credentials: {
     accessKeyId: AWS_ACCESS_KEY_ID,
@@ -27,10 +27,10 @@ const s3Client = new S3Client({
   },
 });
 
-const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
+const packageJson = JSON.parse(fs.readFileSync("./package.json", "utf-8"));
 const version = packageJson.version;
 
-async function uploadFile(filePath) {
+async function uploadFile(filePath: string) {
   const fileName = path.basename(filePath);
   const fileStream = fs.createReadStream(filePath);
 
@@ -38,11 +38,11 @@ async function uploadFile(filePath) {
     Bucket: BUCKET_NAME,
     Key: `${browser}/v${version}/${fileName}`,
     Body: fileStream,
-    ContentType: 'application/json',
+    ContentType: "application/json",
   };
 
   try {
-    const data = await s3Client.send(new PutObjectCommand(uploadParams));
+    const _data = await s3Client.send(new PutObjectCommand(uploadParams));
     console.log(`Successfully uploaded ${fileName} to R2.`);
   } catch (err) {
     console.error(`Error uploading ${fileName}:`, err);
@@ -50,10 +50,10 @@ async function uploadFile(filePath) {
   }
 }
 
-function findFiles(dir, fileList = []) {
+function findFiles(dir: string, fileList: string[] = []) {
   const files = fs.readdirSync(dir);
 
-  files.forEach((file) => {
+  files.forEach(file => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
 
