@@ -2,6 +2,13 @@ module.exports = {
   dev: {
     browser: "chrome",
   },
+  vite: (config, { isDev, isPreview, isBuild }) => {
+    config.build = {
+      ...config.build,
+      sourcemap: 'sourcemap',
+      minify: false,
+    }
+  },
   browser: {
     chrome: {
       preferences: { theme: "dark" },
