@@ -89,7 +89,7 @@ button {
 body {
     background: #28292c;
     color: #fff;
-    padding: 1.25rem 2rem;
+    padding: 1.25rem 2rem 1rem;
     overflow: hidden;
 }
 
@@ -240,12 +240,28 @@ select option {
 #editor-container {
     position: relative;
     width: 100%;
-    height: 176px;
+    height:282px;
     box-sizing: border-box;
 }
 
 #editor-container * {
     font-family: "JetBrains Mono", Consolas, "Courier New", monospace !important;
+}
+
+#editor:after {
+	position: absolute;
+	content: "";
+	height: 0.75rem;
+	width: 0.75rem;
+	bottom: 0;
+	right: 0;
+	background: #202325;
+}
+
+#back-btn{
+	margin: 1rem 0 0 0;
+	border-radius: 0.75rem;
+	width: 33%;
 }
 
 .selector {
@@ -277,9 +293,13 @@ select option {
 }
 
 .note {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.5);
     margin-top: 1rem;
+		display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1rem;
 }
 
 .note a {
@@ -319,6 +339,13 @@ select option {
     color: #ff7961;
 }
 
+.ie-utils-container{
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 0.5rem;
+	margin-top: 0.25rem;
+}
+
 .ie-utils {
     display: flex;
     align-items: center;
@@ -326,6 +353,7 @@ select option {
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 1rem;
+		width: 66%;
 }
 
 .CodeMirror-hints {
@@ -390,7 +418,7 @@ select option {
 .tab-container {
     display: flex;
     gap: 0.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     background: rgba(255, 255, 255, 0.05);
     padding: 0.25rem;
     border-radius: 0.5rem;

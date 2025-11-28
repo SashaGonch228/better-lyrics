@@ -432,10 +432,11 @@
 				</div>
 			</div>
 			<div id="editor-container">
-				<div id="editor" style="height: 176px; overflow: auto"></div>
+				<div id="editor" style="height: 282px; overflow: auto"></div>
 				<div id="sync-indicator">Saving...</div>
 			</div>
-			<div class="ie-utils">
+			<div class="ie-utils-container">
+				<div class="ie-utils">
 				<button id="file-import-btn" class="small-btn">
 					<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
 						<path fill="currentColor" d="M11 16V7.85l-2.6 2.6L7 9l5-5l5 5l-1.4 1.45l-2.6-2.6V16zm-5 4q-.825 0-1.412-.587T4 18v-3h2v3h12v-3h2v3q0 .825-.587 1.413T18 20z"></path>
@@ -461,15 +462,11 @@
 					Open in new tab
 				</button>
 			</div>
-			<p class="note">
-				Note: You can use
-				<a href="https://developer.mozilla.org/en-US/docs/Web/CSS" target="_blank">CSS</a>
-				to style the lyrics. All changes are saved and applied instantly. For
-				more info about the available classes &amp; selectors, visit the
-				<a href="https://github.com/better-lyrics/better-lyrics/blob/master/STYLING.md" target="_blank">documentation</a>.
-			</p>
-			<div id="status-css"></div>
 			<button id="back-btn">Back</button>
+			</div>
+			<p class="note">
+				<svg xmlns="http://www.w3.org/2000/svg" style="display:inline-block;margin-top: -1px;" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="currentColor" d="M3 21v-5h2v3h3v2zm13 0v-2h3v-3h2v5zM3 8V3h5v2H5v3zm16 0V5h-3V3h5v5z"/></svg> For the full editor experience, open this editor in a new tab.</p>
+			<div id="status-css"></div>
 		</div>
 		<script type="module" defer="" src="editor.ts"></script>
 		<script type="module" defer="" src="options.ts"></script>
