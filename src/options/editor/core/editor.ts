@@ -10,7 +10,7 @@ import { css } from "@codemirror/lang-css";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
 import { lintGutter, lintKeymap } from "@codemirror/lint";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { EditorState, Extension } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
@@ -19,7 +19,7 @@ import {
   highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
-  KeyBinding,
+  type KeyBinding,
   lineNumbers,
   rectangularSelection,
   tooltips,
