@@ -2,11 +2,10 @@ module.exports = {
   dev: {
     browser: "chrome",
   },
-  vite: (config, { isDev, isPreview, isBuild }) => {
-    config.build = {
-      ...config.build,
-      sourcemap: 'sourcemap',
-      minify: false,
+  config: (config) => {
+    return {
+      ...config,
+      devtool: "hidden-source-map",
     }
   },
   browser: {
