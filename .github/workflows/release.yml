@@ -60,7 +60,11 @@ jobs:
         run: npm run update-version -- ${{ github.event.inputs.version }}
 
       - name: Build extension
-        run: npm run build
+        env:
+          R2_ENDPOINT: https://f5dbfc5cf299cd799bf49f258675f82b.r2.cloudflarestorage.com
+          AWS_ACCESS_KEY_ID: ${{ secrets.SOURCE_MAP_BUCKET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SOURCE_MAP_BUCKET_SECRET_ACCESS_KEY }}
+        run: npm run build:nightly
 
       - name: Commit version changes
         run: |

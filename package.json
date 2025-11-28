@@ -9,6 +9,7 @@
         "dev:brave": "extension dev --chromium-binary \"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser\" --polyfill",
         "start": "extension start --polyfill",
         "build": "extension build --browser all --polyfill",
+        "build:nightly": "tsx tooling/build-and-patch.js",
         "build:zip": "extension build --browser all --polyfill --zip",
         "preview": "extension preview --polyfill",
         "lint": "npx @biomejs/biome lint --write . && npx @biomejs/biome format --write .",
@@ -46,6 +47,7 @@
         "sortablejs": "^1.15.6"
     },
     "devDependencies": {
+        "@aws-sdk/client-s3": "^3.529.1",
         "@biomejs/biome": "^2.0.4",
         "@prefresh/core": "^1.5.8",
         "@prefresh/utils": "^1.2.1",
