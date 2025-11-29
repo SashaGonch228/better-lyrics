@@ -731,7 +731,14 @@ For multi-voice lyrics (duets, conversations), the `data-agent` attribute contro
 }
 ```
 
-This right-aligns secondary voices (v2, v3) while the primary voice (v1) remains left-aligned, creating a visual conversation layout.
+| Attribute | Description |
+|-----------|-------------|
+| `data-agent="v1"` | Primary voice (default, left-aligned) |
+| `data-agent="v2"` | Secondary voice (right-aligned) |
+| `data-agent="v3"` | Tertiary voice (right-aligned) |
+| `data-agent="v1000"` | Both speakers simultaneously (duet/chorus, centered) |
+
+This right-aligns secondary voices (v2, v3) while the primary voice (v1) remains left-aligned, creating a visual conversation layout. When both speakers sing simultaneously (v1000), the lyrics are centered.
 
 ## 12. Adding a Watermark
 

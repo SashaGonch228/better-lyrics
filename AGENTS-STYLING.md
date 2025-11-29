@@ -119,7 +119,7 @@ Override these variables in custom CSS to create themes:
 | `.blyrics--error` | Error message |
 | `[data-agent="v2"]` | Secondary voice (right-aligned) |
 | `[data-agent="v3"]` | Tertiary voice (right-aligned) |
-| `[data-agent="v1000"]` | Both speakers simultaneously (duet/chorus) |
+| `[data-agent="v1000"]` | Both speakers simultaneously (duet/chorus, centered) |
 
 ## Animation System
 
