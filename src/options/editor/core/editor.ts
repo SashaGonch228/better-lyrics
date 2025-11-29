@@ -9,8 +9,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { css } from "@codemirror/lang-css";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
 import { lintGutter, lintKeymap } from "@codemirror/lint";
-import { highlightSelectionMatches } from "@codemirror/search";
-import { EditorState } from "@codemirror/state";
+import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { EditorState, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
@@ -19,6 +19,7 @@ import {
   highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
+  type KeyBinding,
   lineNumbers,
   rectangularSelection,
   tooltips,
@@ -27,6 +28,10 @@ import { materialDark } from "@fsegurai/codemirror-theme-material-dark";
 import { cssLinter } from "../features/syntax";
 import { rainbowBrackets } from "../features/syntax";
 import { onChange } from "../features/themes";
+
+export interface EditorOptions {
+  enableSearch?: boolean;
+}
 
 export const SAVE_DEBOUNCE_DELAY = 1000;
 export const SAVE_CUSTOM_THEME_DEBOUNCE = 2000;
@@ -80,8 +85,13 @@ export const stylelintConfig = {
   },
 };
 
-export function createEditorState(initialContents: string) {
-  let extensions = [
+export function createEditorState(initialContents: string, options: EditorOptions = {}) {
+  const { enableSearch = false } = options;
+
+  const searchExtensions: Extension[] = enableSearch ? [search()] : [];
+  const searchKeybindings: readonly KeyBinding[] = enableSearch ? searchKeymap : [];
+
+  let extensions: Extension[] = [
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightSpecialChars(),
@@ -98,6 +108,7 @@ export function createEditorState(initialContents: string) {
     crosshairCursor(),
     highlightActiveLine(),
     highlightSelectionMatches(),
+    ...searchExtensions,
     keymap.of([
       { key: "Tab", run: acceptCompletion },
       indentWithTab,
@@ -107,6 +118,7 @@ export function createEditorState(initialContents: string) {
       ...foldKeymap,
       ...completionKeymap,
       ...lintKeymap,
+      ...searchKeybindings,
     ]),
     css(),
     lintGutter(),

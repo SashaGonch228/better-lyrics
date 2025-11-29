@@ -115,23 +115,29 @@ export class ImportManager {
 
       console.log(`[ImportManager] Step 2: Incrementing save count`);
       editorStateManager.incrementSaveCount();
+      editorStateManager.setIsSaving(true);
 
-      console.log(`[ImportManager] Step 3: Setting editor content`);
-      await editorStateManager.setEditorContent(css, `file-import:${filename}`);
+      try {
+        console.log(`[ImportManager] Step 3: Setting editor content`);
+        await editorStateManager.setEditorContent(css, `file-import:${filename}`);
 
-      console.log(`[ImportManager] Step 4: Saving to storage`);
-      const result = await saveToStorageWithFallback(css);
+        console.log(`[ImportManager] Step 4: Saving to storage`);
+        const result = await saveToStorageWithFallback(css);
 
-      if (!result.success || !result.strategy) {
-        throw new Error(`Storage save failed: ${result.error?.message || "Unknown error"}`);
+        if (!result.success || !result.strategy) {
+          throw new Error(`Storage save failed: ${result.error?.message || "Unknown error"}`);
+        }
+
+        console.log(`[ImportManager] Step 5: Sending update message`);
+        showSyncSuccess(result.strategy, result.wasRetry);
+        await sendUpdateMessage(css, result.strategy);
+
+        console.log(`[ImportManager] Import completed successfully`);
+        showAlert(`CSS file "${filename}" imported successfully!`);
+      } finally {
+        editorStateManager.setIsSaving(false);
+        editorStateManager.resetSaveCount();
       }
-
-      console.log(`[ImportManager] Step 5: Sending update message`);
-      showSyncSuccess(result.strategy, result.wasRetry);
-      await sendUpdateMessage(css, result.strategy);
-
-      console.log(`[ImportManager] Import completed successfully`);
-      showAlert(`CSS file "${filename}" imported successfully!`);
     });
   }
 }

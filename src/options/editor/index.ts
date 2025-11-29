@@ -1,3 +1,4 @@
+import { openSearchPanel } from "@codemirror/search";
 import { showAlert } from "./ui/feedback";
 import {
   deleteThemeBtn,
@@ -31,6 +32,13 @@ export function initializeNavigation() {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
       saveToStorage();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      let view = editorStateManager.getEditor();
+      if (view) {
+        openSearchPanel(view);
+      }
+      e.preventDefault();
     }
   });
 }
@@ -106,14 +114,24 @@ export async function initializeEditor() {
   console.log("[BetterLyrics] DOM loaded, initializing editor");
 
   const editorElement = document.getElementById("editor")!;
-  const initialEditor = createEditorView(createEditorState("Loading..."), editorElement);
+  const isStandalone = document.querySelector(".theme-name-display.standalone") !== null;
+  const initialEditor = createEditorView(
+    createEditorState("Loading...", { enableSearch: isStandalone }),
+    editorElement
+  );
 
   editorStateManager.setEditor(initialEditor);
 
-  document.getElementById("editor-popout-button")?.addEventListener("click", () => {
+  const openStandaloneEditor = () => {
     chrome.tabs.create({
       url: chrome.runtime.getURL("pages/standalone-editor.html"),
     });
+  };
+
+  document.getElementById("editor-popout-button")?.addEventListener("click", openStandaloneEditor);
+  document.getElementById("editor-popout-link")?.addEventListener("click", e => {
+    e.preventDefault();
+    openStandaloneEditor();
   });
 
   console.log("[BetterLyrics] Loading theme name and initial CSS");

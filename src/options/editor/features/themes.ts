@@ -92,15 +92,21 @@ export class ThemeManager {
 
   private async saveTheme(css: string): Promise<void> {
     editorStateManager.incrementSaveCount();
+    editorStateManager.setIsSaving(true);
 
-    const result = await saveToStorageWithFallback(css, true);
+    try {
+      const result = await saveToStorageWithFallback(css, true);
 
-    if (!result.success || !result.strategy) {
-      throw new Error(`Failed to save theme: ${result.error?.message || "Unknown error"}`);
+      if (!result.success || !result.strategy) {
+        throw new Error(`Failed to save theme: ${result.error?.message || "Unknown error"}`);
+      }
+
+      showSyncSuccess(result.strategy, result.wasRetry);
+      await sendUpdateMessage(css, result.strategy);
+    } finally {
+      editorStateManager.setIsSaving(false);
+      editorStateManager.resetSaveCount();
     }
-
-    showSyncSuccess(result.strategy, result.wasRetry);
-    await sendUpdateMessage(css, result.strategy);
   }
 }
 
@@ -203,6 +209,7 @@ export function saveToStorage(isTheme = false) {
   }
 
   editorStateManager.incrementSaveCount();
+  editorStateManager.setIsSaving(true);
   const css = currentEditor.state.doc.toString();
 
   const isCustom = editorStateManager.getIsCustomTheme();
@@ -223,9 +230,12 @@ export function saveToStorage(isTheme = false) {
     .catch(err => {
       console.error("Error saving to storage:", err);
       showSyncError(err);
+    })
+    .finally(() => {
+      editorStateManager.setIsSaving(false);
+      editorStateManager.setIsUserTyping(false);
+      editorStateManager.resetSaveCount();
     });
-
-  editorStateManager.setIsUserTyping(false);
 }
 
 export function updateThemeSelectorButton() {

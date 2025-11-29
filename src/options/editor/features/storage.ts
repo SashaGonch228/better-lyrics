@@ -60,11 +60,6 @@ async function clearCSSChunks(): Promise<void> {
   }
 }
 
-async function clearOldCSSData(): Promise<void> {
-  await clearCSSChunks();
-  await chrome.storage.local.remove(["customCSS", "customCSS_chunked", "customCSS_chunkCount", "cssCompressed"]);
-}
-
 async function clearLyricsCacheIfNeeded(requiredSpace: number): Promise<void> {
   const usage = await getStorageUsage();
   const availableSpace = usage.total - usage.used;
@@ -89,8 +84,6 @@ async function clearLyricsCacheIfNeeded(requiredSpace: number): Promise<void> {
 async function saveChunkedCSS(css: string): Promise<void> {
   console.log(`[BetterLyrics] Saving CSS in chunks. Total size: ${css.length} bytes`);
 
-  await clearOldCSSData();
-
   const storageUsage = await getStorageUsage();
   console.log(`[BetterLyrics] Storage usage before save: ${storageUsage.used} / ${storageUsage.total} bytes`);
 
@@ -103,6 +96,9 @@ async function saveChunkedCSS(css: string): Promise<void> {
   }
 
   console.log(`[BetterLyrics] Splitting into ${chunks.length} chunks of ~${CHUNK_SIZE} bytes each`);
+
+  const oldMetadata = await chrome.storage.local.get(["customCSS_chunkCount"]);
+  const oldChunkCount = oldMetadata.customCSS_chunkCount || 0;
 
   for (let i = 0; i < chunks.length; i++) {
     try {
@@ -122,6 +118,17 @@ async function saveChunkedCSS(css: string): Promise<void> {
     cssStorageType: "chunked",
     customCSS_chunkCount: chunks.length,
   });
+
+  await chrome.storage.local.remove(["customCSS", "cssCompressed"]);
+  await chrome.storage.sync.remove("customCSS");
+
+  if (oldChunkCount > chunks.length) {
+    const extraChunkKeys = Array.from(
+      { length: oldChunkCount - chunks.length },
+      (_, i) => `customCSS_chunk_${chunks.length + i}`
+    );
+    await chrome.storage.local.remove(extraChunkKeys);
+  }
 
   const finalUsage = await getStorageUsage();
   console.log(`[BetterLyrics] Storage usage after save: ${finalUsage.used} / ${finalUsage.total} bytes`);
@@ -158,7 +165,7 @@ export const getStorageStrategy = (css: string): "local" | "sync" | "chunked" =>
   return cssSize > SYNC_STORAGE_LIMIT ? "local" : "sync";
 };
 
-export const saveToStorageWithFallback = async (css: string, isTheme = false, retryCount = 0): Promise<SaveResult> => {
+export const saveToStorageWithFallback = async (css: string, _isTheme = false, retryCount = 0): Promise<SaveResult> => {
   try {
     const cssSize = new Blob([css]).size;
     console.log(`[BetterLyrics] Saving CSS: ${cssSize} bytes (${(cssSize / 1024).toFixed(2)} KB)`);
@@ -182,16 +189,17 @@ export const saveToStorageWithFallback = async (css: string, isTheme = false, re
     }
 
     if (strategy === "local") {
-      await clearOldCSSData();
       const estimatedSize = compressedSize * 1.2;
       await clearLyricsCacheIfNeeded(estimatedSize);
       await chrome.storage.local.set({ customCSS: cssToStore, cssCompressed: shouldCompress });
-      await chrome.storage.sync.remove("customCSS");
       await chrome.storage.sync.set({ cssStorageType: "local", cssCompressed: shouldCompress });
+      await clearCSSChunks();
+      await chrome.storage.sync.remove("customCSS");
       console.log(`[BetterLyrics] Saved to local storage`);
     } else {
-      await clearOldCSSData();
       await chrome.storage.sync.set({ customCSS: cssToStore, cssStorageType: "sync", cssCompressed: shouldCompress });
+      await clearCSSChunks();
+      await chrome.storage.local.remove(["customCSS", "cssCompressed"]);
       console.log(`[BetterLyrics] Saved to sync storage`);
     }
 
@@ -351,7 +359,17 @@ export class StorageManager {
     console.log("[StorageManager] Storage listeners initialized");
   }
 
-  private async handleCSSChange(change: any): Promise<void> {
+  private async handleCSSChange(_change: any): Promise<void> {
+    if (editorStateManager.getIsSaving()) {
+      console.log("[StorageManager] Skipping CSS reload (save in progress)");
+      return;
+    }
+
+    if (editorStateManager.getIsUserTyping()) {
+      console.log("[StorageManager] Skipping CSS reload (user is typing)");
+      return;
+    }
+
     const saveCount = editorStateManager.getSaveCount();
     console.log(`[StorageManager] CSS change detected, saveCount: ${saveCount}`);
 
@@ -372,8 +390,19 @@ export class StorageManager {
   }
 
   private async handleThemeNameChange(): Promise<void> {
-    console.log("[StorageManager] Theme name changed");
+    if (editorStateManager.getIsSaving()) {
+      console.log("[StorageManager] Skipping theme reload (save in progress)");
+      return;
+    }
+
+    console.log("[StorageManager] Theme name changed, reloading CSS");
     await setThemeName();
+
+    await editorStateManager.queueOperation("storage", async () => {
+      const css = await loadCustomCSS();
+      console.log(`[StorageManager] CSS loaded from theme change: ${css.length} bytes`);
+      await editorStateManager.setEditorContent(css, "theme-name-change");
+    });
   }
 
   async loadInitialCSS(): Promise<void> {
