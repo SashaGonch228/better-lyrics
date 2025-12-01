@@ -1,6 +1,6 @@
 // Function to save user options
 import Sortable from "sortablejs";
-import { initStoreUI, openStoreModal, openUrlModal, setupYourThemesButton } from "./store/storeUI";
+import { initStoreUI, openStoreModal, openUrlModal, setupYourThemesButton } from "./store/store";
 
 interface Options {
   isLogsEnabled: boolean;

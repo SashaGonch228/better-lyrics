@@ -28,6 +28,20 @@ let currentDetailTheme: StoreTheme | null = null;
 let currentSlideIndex = 0;
 let storeThemesCache: StoreTheme[] = [];
 
+interface FilterState {
+  searchQuery: string;
+  showFilter: "all" | "installed" | "not-installed";
+  hasShaders: boolean;
+  versionCompatible: boolean;
+}
+
+let currentFilters: FilterState = {
+  searchQuery: "",
+  showFilter: "all",
+  hasShaders: false,
+  versionCompatible: true,
+};
+
 const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 
 function createShaderIcon(): SVGSVGElement {
@@ -106,6 +120,15 @@ async function reloadEditorIfActiveThemeUpdated(updatedIds: string[]): Promise<v
 function setupKeyboardListeners(): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      const filterDropdown = document.getElementById("store-filter-dropdown");
+      if (filterDropdown?.classList.contains("active")) {
+        e.preventDefault();
+        e.stopPropagation();
+        filterDropdown.classList.remove("active");
+        document.getElementById("store-filter-btn")?.classList.remove("active");
+        return;
+      }
+
       const dropdown = document.getElementById("your-themes-dropdown");
       if (dropdown?.classList.contains("active")) {
         e.preventDefault();
@@ -168,6 +191,144 @@ function setupStoreModalListeners(): void {
 
   const retryBtn = document.getElementById("store-retry-btn");
   retryBtn?.addEventListener("click", () => populateStoreModal());
+
+  setupSearchAndFilter();
+}
+
+function setupSearchAndFilter(): void {
+  const searchInput = document.getElementById("store-search-input") as HTMLInputElement;
+  const filterBtn = document.getElementById("store-filter-btn");
+  const filterDropdown = document.getElementById("store-filter-dropdown");
+  const filterRadios = document.querySelectorAll('input[name="store-filter-show"]');
+  const shaderCheckbox = document.getElementById("store-filter-shaders") as HTMLInputElement;
+  const compatibleCheckbox = document.getElementById("store-filter-compatible") as HTMLInputElement;
+
+  searchInput?.addEventListener("input", () => {
+    currentFilters.searchQuery = searchInput.value.trim().toLowerCase();
+    applyFiltersToGrid();
+  });
+
+  filterBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleFilterDropdown();
+  });
+
+  filterDropdown?.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  filterRadios.forEach(radio => {
+    radio.addEventListener("change", () => {
+      const value = (radio as HTMLInputElement).value as FilterState["showFilter"];
+      currentFilters.showFilter = value;
+      applyFiltersToGrid();
+      updateFilterButtonState();
+    });
+  });
+
+  shaderCheckbox?.addEventListener("change", () => {
+    currentFilters.hasShaders = shaderCheckbox.checked;
+    applyFiltersToGrid();
+    updateFilterButtonState();
+  });
+
+  compatibleCheckbox?.addEventListener("change", () => {
+    currentFilters.versionCompatible = compatibleCheckbox.checked;
+    applyFiltersToGrid();
+    updateFilterButtonState();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (filterDropdown?.classList.contains("active")) {
+      if (!filterBtn?.contains(e.target as Node) && !filterDropdown.contains(e.target as Node)) {
+        filterDropdown.classList.remove("active");
+        filterBtn?.classList.remove("active");
+      }
+    }
+  });
+}
+
+function toggleFilterDropdown(): void {
+  const filterBtn = document.getElementById("store-filter-btn");
+  const filterDropdown = document.getElementById("store-filter-dropdown");
+
+  if (!filterBtn || !filterDropdown) return;
+
+  const isActive = filterDropdown.classList.contains("active");
+  filterDropdown.classList.toggle("active", !isActive);
+  filterBtn.classList.toggle("active", !isActive);
+}
+
+function updateFilterButtonState(): void {
+  const filterBtn = document.getElementById("store-filter-btn");
+  if (!filterBtn) return;
+
+  const hasActiveFilter = currentFilters.showFilter !== "all" ||
+    currentFilters.hasShaders ||
+    !currentFilters.versionCompatible;
+  filterBtn.classList.toggle("has-filter", hasActiveFilter);
+}
+
+async function applyFiltersToGrid(): Promise<void> {
+  const grid = document.getElementById("store-modal-grid");
+  if (!grid) return;
+
+  const installedThemes = await getInstalledStoreThemes();
+  const installedIds = new Set(installedThemes.map(t => t.id));
+
+  const cards = grid.querySelectorAll(".store-card");
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    const themeId = (card as HTMLElement).dataset.themeId;
+    if (!themeId) return;
+
+    const theme = storeThemesCache.find(t => t.id === themeId);
+    if (!theme) return;
+
+    const matchesSearch = matchesSearchQuery(theme, currentFilters.searchQuery);
+    const matchesShowFilter = matchesInstallFilter(theme.id, installedIds, currentFilters.showFilter);
+    const matchesShaderFilter = !currentFilters.hasShaders || theme.hasShaders;
+    const matchesVersionFilter = !currentFilters.versionCompatible ||
+      isVersionCompatible(theme.minVersion, EXTENSION_VERSION);
+
+    const isVisible = matchesSearch && matchesShowFilter && matchesShaderFilter && matchesVersionFilter;
+    (card as HTMLElement).style.display = isVisible ? "" : "none";
+
+    if (isVisible) visibleCount++;
+  });
+
+  const existingEmpty = grid.querySelector(".store-empty");
+  if (existingEmpty) existingEmpty.remove();
+
+  if (visibleCount === 0 && storeThemesCache.length > 0) {
+    const emptyMsg = document.createElement("p");
+    emptyMsg.className = "store-empty";
+    emptyMsg.textContent = "No themes match your filters";
+    grid.appendChild(emptyMsg);
+  }
+}
+
+function matchesSearchQuery(theme: StoreTheme, query: string): boolean {
+  if (!query) return true;
+
+  const searchableText = [
+    theme.title,
+    theme.description,
+    ...theme.creators,
+  ].join(" ").toLowerCase();
+
+  return searchableText.includes(query);
+}
+
+function matchesInstallFilter(
+  themeId: string,
+  installedIds: Set<string>,
+  filter: FilterState["showFilter"]
+): boolean {
+  if (filter === "all") return true;
+  const isInstalled = installedIds.has(themeId);
+  return filter === "installed" ? isInstalled : !isInstalled;
 }
 
 function setupDetailModalListeners(): void {
@@ -781,10 +942,34 @@ export function toggleYourThemesDropdown(show?: boolean): void {
   }
 }
 
+function resetFilters(): void {
+  currentFilters = {
+    searchQuery: "",
+    showFilter: "all",
+    hasShaders: false,
+    versionCompatible: true,
+  };
+
+  const searchInput = document.getElementById("store-search-input") as HTMLInputElement;
+  if (searchInput) searchInput.value = "";
+
+  const allRadio = document.querySelector('input[name="store-filter-show"][value="all"]') as HTMLInputElement;
+  if (allRadio) allRadio.checked = true;
+
+  const shaderCheckbox = document.getElementById("store-filter-shaders") as HTMLInputElement;
+  if (shaderCheckbox) shaderCheckbox.checked = false;
+
+  const compatibleCheckbox = document.getElementById("store-filter-compatible") as HTMLInputElement;
+  if (compatibleCheckbox) compatibleCheckbox.checked = true;
+
+  updateFilterButtonState();
+}
+
 async function refreshStore(): Promise<void> {
   const grid = document.getElementById("store-modal-grid");
   if (grid) grid.replaceChildren();
   storeThemesCache = [];
+  resetFilters();
   await populateStoreModal();
   await checkForThemeUpdates();
 }
