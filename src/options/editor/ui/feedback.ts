@@ -9,17 +9,46 @@ import {
   modalTitle,
 } from "./dom";
 
-export const showAlert = (message: string): void => {
-  const status = document.getElementById("status-css")!;
-  status.innerText = message;
+let alertTimeoutId: ReturnType<typeof setTimeout> | null = null;
+const ALERT_DURATION = 2000;
+
+export const showAlert = (message: string, highlightText?: string): void => {
+  const status = document.getElementById("status-css");
+  if (!status) return;
+
+  const isAlreadyActive = status.classList.contains("active");
+
+  status.replaceChildren();
+  if (highlightText) {
+    const parts = message.split(highlightText);
+    if (parts.length === 2) {
+      status.appendChild(document.createTextNode(parts[0]));
+      const pre = document.createElement("pre");
+      pre.textContent = highlightText;
+      status.appendChild(pre);
+      status.appendChild(document.createTextNode(parts[1]));
+    } else {
+      status.textContent = message;
+    }
+  } else {
+    status.textContent = message;
+  }
+
   status.classList.add("active");
 
-  setTimeout(() => {
+  if (alertTimeoutId) {
+    clearTimeout(alertTimeoutId);
+  }
+
+  const duration = isAlreadyActive ? ALERT_DURATION * 2 : ALERT_DURATION;
+
+  alertTimeoutId = setTimeout(() => {
     status.classList.remove("active");
     setTimeout(() => {
-      status.innerText = "";
+      status.replaceChildren();
     }, 200);
-  }, 2000);
+    alertTimeoutId = null;
+  }, duration);
 };
 
 export function showModal(options: ModalOptions): Promise<string | null> {

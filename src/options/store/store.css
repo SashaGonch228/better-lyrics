@@ -1343,3 +1343,44 @@
 #your-themes-dropdown::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Toast Notification */
+#status-css.toast {
+  position: fixed;
+  display: block;
+  top: unset;
+  bottom: 2rem;
+  left: unset;
+  right: 2rem;
+  width: max-content;
+  max-width: calc(100vw - 4rem);
+  height: auto;
+  transform: translateX(0) translateY(calc(100% + 2rem));
+  background: #2d2d30;
+  color: #fff;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 4px 10px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 100000;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.3s ease, width 0.2s ease;
+  white-space: nowrap;
+}
+
+#status-css.toast.active {
+  transform: translateX(0) translateY(0);
+  opacity: 1;
+}
+
+.toast pre {
+  all: unset;
+  display: inline !important;
+  margin-left: 0.125rem;
+  padding: 0.125rem 0.375rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+}

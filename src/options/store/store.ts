@@ -800,7 +800,12 @@ function createStoreThemeCard(theme: StoreTheme, isInstalled: boolean, stats?: T
 
   actionBtn.addEventListener("click", async e => {
     e.stopPropagation();
-    await handleThemeAction(theme, actionBtn);
+    card.dataset.loading = "true";
+    try {
+      await handleThemeAction(theme, actionBtn);
+    } finally {
+      delete card.dataset.loading;
+    }
   });
 
   info.appendChild(title);
@@ -837,7 +842,10 @@ function createStoreThemeCard(theme: StoreTheme, isInstalled: boolean, stats?: T
     card.appendChild(statsRow);
   }
 
-  card.addEventListener("click", () => openDetailModal(theme));
+  card.addEventListener("click", () => {
+    if (card.dataset.loading) return;
+    openDetailModal(theme);
+  });
 
   if (theme.hasShaders) {
     card.appendChild(createShaderBadge("store-card-badge"));
@@ -868,27 +876,37 @@ function createStoreThemeCard(theme: StoreTheme, isInstalled: boolean, stats?: T
 
 async function handleThemeAction(theme: StoreTheme, button: HTMLButtonElement): Promise<void> {
   button.disabled = true;
-  const currentlyInstalled = await isThemeInstalled(theme.id);
-  button.textContent = currentlyInstalled ? "Removing..." : "Installing...";
+  const isRemoveButton = button.classList.contains("store-card-btn-remove");
 
   try {
-    if (currentlyInstalled) {
+    if (isRemoveButton) {
       await removeTheme(theme.id);
       button.className = "store-card-btn store-card-btn-install";
       button.textContent = "Install";
-      showAlert(`Removed "${theme.title}"`);
+      showAlert(`Removed ${theme.title}`, theme.title);
     } else {
       await installTheme(theme);
       button.className = "store-card-btn store-card-btn-remove";
       button.textContent = "Remove";
-      showAlert(`Installed "${theme.title}"`);
-      trackInstall(theme.id).catch(() => {});
+      showAlert(`Installed ${theme.title}`, theme.title);
+      trackInstall(theme.id)
+        .then(result => {
+          if (result.success && result.data !== null) {
+            if (storeStatsCache[theme.id]) {
+              storeStatsCache[theme.id].installs = result.data;
+            } else {
+              storeStatsCache[theme.id] = { installs: result.data, rating: 0, ratingCount: 0 };
+            }
+          }
+        })
+        .catch(() => {});
     }
 
     updateYourThemesDropdown();
   } catch (err) {
     console.error("[ThemeStore] Action failed:", err);
-    button.textContent = currentlyInstalled ? "Remove" : "Install";
+    button.className = `store-card-btn ${isRemoveButton ? "store-card-btn-remove" : "store-card-btn-install"}`;
+    button.textContent = isRemoveButton ? "Remove" : "Install";
     showAlert(`Failed: ${err}`);
   } finally {
     button.disabled = false;
@@ -1033,28 +1051,45 @@ async function openDetailModal(theme: StoreTheme): Promise<void> {
 
   const initialInstalled = await isThemeInstalled(theme.id);
 
+  const ratingSectionEl2 = document.getElementById("detail-rating-section");
+  if (ratingSectionEl2) {
+    ratingSectionEl2.style.display = initialInstalled ? "" : "none";
+  }
+
   if (actionBtn) {
     actionBtn.className = `store-card-btn ${initialInstalled ? "store-card-btn-remove" : "store-card-btn-install"}`;
     actionBtn.textContent = initialInstalled ? "Remove" : "Install";
     actionBtn.onclick = async () => {
       actionBtn.disabled = true;
-      const currentlyInstalled = await isThemeInstalled(theme.id);
+      const isRemoveButton = actionBtn.classList.contains("store-card-btn-remove");
       try {
-        if (currentlyInstalled) {
+        if (isRemoveButton) {
           await removeTheme(theme.id);
           actionBtn.className = "store-card-btn store-card-btn-install";
           actionBtn.textContent = "Install";
-          showAlert(`Removed "${theme.title}"`);
+          showAlert(`Removed ${theme.title}`, theme.title);
         } else {
           await installTheme(theme);
           actionBtn.className = "store-card-btn store-card-btn-remove";
           actionBtn.textContent = "Remove";
-          showAlert(`Installed "${theme.title}"`);
-          trackInstall(theme.id).catch(() => {});
+          showAlert(`Installed ${theme.title}`, theme.title);
+          trackInstall(theme.id)
+            .then(result => {
+              if (result.success && result.data !== null) {
+                if (storeStatsCache[theme.id]) {
+                  storeStatsCache[theme.id].installs = result.data;
+                } else {
+                  storeStatsCache[theme.id] = { installs: result.data, rating: 0, ratingCount: 0 };
+                }
+              }
+            })
+            .catch(() => {});
         }
         updateYourThemesDropdown();
         await refreshStoreCards();
       } catch (err) {
+        actionBtn.className = `store-card-btn ${isRemoveButton ? "store-card-btn-remove" : "store-card-btn-install"}`;
+        actionBtn.textContent = isRemoveButton ? "Remove" : "Install";
         showAlert(`Failed: ${err}`);
       } finally {
         actionBtn.disabled = false;
@@ -1103,6 +1138,7 @@ async function openDetailModal(theme: StoreTheme): Promise<void> {
 
   initSlideshow();
 
+  document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
   detailModalOverlay.style.display = "flex";
   requestAnimationFrame(() => {
@@ -1121,6 +1157,7 @@ function closeDetailModal(): void {
         detailModalOverlay.style.display = "none";
         modal?.classList.remove("closing");
       }
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
     }, 200);
   }
@@ -1211,6 +1248,7 @@ export function openUrlModal(): void {
     const error = document.getElementById("url-modal-error");
     if (error) error.style.display = "none";
 
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
     urlModalOverlay.style.display = "flex";
     requestAnimationFrame(() => {
@@ -1231,6 +1269,7 @@ function closeUrlModal(): void {
         urlModalOverlay.style.display = "none";
         modal?.classList.remove("closing");
       }
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
     }, 200);
   }
@@ -1288,7 +1327,7 @@ async function handleUrlInstall(): Promise<void> {
     trackInstall(theme.id).catch(() => {});
 
     const branchInfo = branch ? ` (${branch})` : "";
-    showAlert(`Installed "${theme.title}" from ${repo}${branchInfo}`);
+    showAlert(`Installed ${theme.title} from ${repo}${branchInfo}`, theme.title);
     closeUrlModal();
     updateYourThemesDropdown();
   } catch (err) {
@@ -1377,7 +1416,7 @@ async function handleApplyTheme(theme: InstalledStoreTheme): Promise<void> {
     });
     document.dispatchEvent(event);
 
-    showAlert(`Applied "${theme.title}"`);
+    showAlert(`Applied ${theme.title}`, theme.title);
     updateYourThemesDropdown();
     toggleYourThemesDropdown(false);
   } catch (err) {
