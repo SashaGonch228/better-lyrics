@@ -1,10 +1,4 @@
 module.exports = {
-  config: (config) => {
-    if (config.mode === "production") {
-      config.devtool = false;
-    }
-    return config;
-  },
   dev: {
     browser: "chrome",
   },
