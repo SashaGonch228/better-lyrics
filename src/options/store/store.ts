@@ -357,6 +357,14 @@ function setupMarketplaceListeners(): void {
   const urlInstallBtn = document.getElementById("url-install-btn");
   urlInstallBtn?.addEventListener("click", () => openUrlModal());
 
+  const permissionBtn = document.getElementById("store-permission-btn");
+  permissionBtn?.addEventListener("click", async () => {
+    const granted = await requestStorePermissions();
+    if (granted) {
+      loadMarketplace();
+    }
+  });
+
   setupMarketplaceFilters();
 }
 
@@ -739,20 +747,21 @@ async function loadMarketplace(): Promise<void> {
   const grid = document.getElementById("store-modal-grid");
   const loading = document.getElementById("store-loading");
   const error = document.getElementById("store-error");
+  const permissionSection = document.getElementById("store-permission");
 
   if (!grid) return;
 
   grid.replaceChildren();
   if (loading) loading.style.display = "flex";
   if (error) error.style.display = "none";
+  if (permissionSection) permissionSection.style.display = "none";
 
   try {
     const permission = await checkStorePermissions();
     if (!permission.granted) {
-      const granted = await requestStorePermissions();
-      if (!granted) {
-        throw new Error("GitHub access is required to browse themes");
-      }
+      if (loading) loading.style.display = "none";
+      if (permissionSection) permissionSection.style.display = "flex";
+      return;
     }
 
     const [themes, installedThemes, statsResult] = await Promise.all([
@@ -1673,12 +1682,9 @@ async function handleUrlInstall(): Promise<void> {
   if (error) error.style.display = "none";
 
   try {
-    const permission = await checkStorePermissions();
-    if (!permission.granted) {
-      const granted = await requestStorePermissions();
-      if (!granted) {
-        throw new Error("GitHub access required");
-      }
+    const granted = await requestStorePermissions();
+    if (!granted) {
+      throw new Error("GitHub access required");
     }
 
     const validation = await validateThemeRepo(repo, branch);
