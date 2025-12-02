@@ -37,7 +37,7 @@
 						</svg>
 						<input type="text" id="store-search-input" class="store-search-input" placeholder="Search themes..." />
 						<div class="search-shortcut-hint">
-							<kbd id="search-mod-key">⌘</kbd><kbd>K</kbd>
+							<kbd>/</kbd>
 						</div>
 					</div>
 					<button id="store-refresh-btn" class="store-refresh-btn" title="Refresh (R)">
@@ -56,20 +56,23 @@
 			<div class="marketplace-filters">
 				<div class="marketplace-filter-group">
 					<span class="marketplace-filter-label">Sort by</span>
-					<div class="marketplace-filter-options">
-						<label class="marketplace-filter-chip">
+					<div class="marketplace-filter-options" role="group" aria-label="Sort options">
+						<label class="marketplace-filter-chip marketplace-filter-chip--sort" data-label-desc="Highest rated" data-label-asc="Lowest rated">
 							<input type="radio" name="store-filter-sort" value="rating" checked>
-							<span>Highest rated</span>
+							<span class="marketplace-filter-chip__icon" aria-hidden="true"></span>
+							<span class="marketplace-filter-chip__label">Highest rated</span>
 							<kbd>1</kbd>
 						</label>
-						<label class="marketplace-filter-chip">
+						<label class="marketplace-filter-chip marketplace-filter-chip--sort" data-label-desc="Most downloaded" data-label-asc="Least downloaded">
 							<input type="radio" name="store-filter-sort" value="downloads">
-							<span>Most downloaded</span>
+							<span class="marketplace-filter-chip__icon" aria-hidden="true"></span>
+							<span class="marketplace-filter-chip__label">Most downloaded</span>
 							<kbd>2</kbd>
 						</label>
-						<label class="marketplace-filter-chip">
+						<label class="marketplace-filter-chip marketplace-filter-chip--sort" data-label-desc="Newest" data-label-asc="Oldest">
 							<input type="radio" name="store-filter-sort" value="newest">
-							<span>Newest</span>
+							<span class="marketplace-filter-chip__icon" aria-hidden="true"></span>
+							<span class="marketplace-filter-chip__label">Newest</span>
 							<kbd>3</kbd>
 						</label>
 					</div>
@@ -257,7 +260,7 @@
 							<div class="shortcut-item">
 								<span class="shortcut-label">Search themes</span>
 								<div class="shortcut-keys">
-									<kbd>/</kbd><span>or</span><kbd id="shortcut-mod-key">⌘</kbd><kbd>K</kbd>
+									<kbd>/</kbd>
 								</div>
 							</div>
 							<div class="shortcut-item">
@@ -286,21 +289,21 @@
 							</div>
 						</div>
 						<div class="shortcuts-group">
-							<div class="shortcuts-group-title">Sort</div>
+							<div class="shortcuts-group-title">Sort <span class="shortcuts-group-hint">(press again to toggle direction)</span></div>
 							<div class="shortcut-item">
-								<span class="shortcut-label">Highest rated</span>
+								<span class="shortcut-label">By rating</span>
 								<div class="shortcut-keys">
 									<kbd>1</kbd>
 								</div>
 							</div>
 							<div class="shortcut-item">
-								<span class="shortcut-label">Most downloaded</span>
+								<span class="shortcut-label">By downloads</span>
 								<div class="shortcut-keys">
 									<kbd>2</kbd>
 								</div>
 							</div>
 							<div class="shortcut-item">
-								<span class="shortcut-label">Newest</span>
+								<span class="shortcut-label">By date</span>
 								<div class="shortcut-keys">
 									<kbd>3</kbd>
 								</div>

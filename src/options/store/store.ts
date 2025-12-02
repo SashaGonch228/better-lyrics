@@ -30,7 +30,6 @@ let detailModalOverlay: HTMLElement | null = null;
 let urlModalOverlay: HTMLElement | null = null;
 let shortcutsModalOverlay: HTMLElement | null = null;
 let currentDetailTheme: StoreTheme | null = null;
-const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 let currentSlideIndex = 0;
 let storeThemesCache: StoreTheme[] = [];
 let storeStatsCache: AllThemeStats = {};
@@ -70,6 +69,7 @@ function setActionButtonContent(button: HTMLElement, text: string, shortcut?: st
 interface FilterState {
   searchQuery: string;
   sortBy: "rating" | "downloads" | "newest";
+  sortDirection: "desc" | "asc";
   showFilter: "all" | "installed" | "not-installed";
   hasShaders: boolean;
   versionCompatible: boolean;
@@ -78,6 +78,7 @@ interface FilterState {
 let currentFilters: FilterState = {
   searchQuery: "",
   sortBy: "rating",
+  sortDirection: "desc",
   showFilter: "all",
   hasShaders: false,
   versionCompatible: true,
@@ -331,7 +332,6 @@ export async function initMarketplaceUI(): Promise<void> {
   shortcutsModalOverlay = document.getElementById("shortcuts-modal-overlay");
   isMarketplacePage = true;
 
-  updateModifierKeyDisplay();
   setupMarketplaceListeners();
   setupDetailModalListeners();
   setupUrlModalListeners();
@@ -360,9 +360,73 @@ function setupMarketplaceListeners(): void {
   setupMarketplaceFilters();
 }
 
+function createSortIcon(direction: "desc" | "asc"): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("viewBox", "0 0 640 640");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("sort-direction-icon");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("fill", "currentColor");
+
+  if (direction === "desc") {
+    path.setAttribute(
+      "d",
+      "m278.6 438.6l-96 96c-12.5 12.5-32.8 12.5-45.3 0l-96-96c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l41.4 41.4V128c0-17.7 14.3-32 32-32s32 14.3 32 32v306.7l41.4-41.4c12.5-12.5 32.8-12.5 45.3 0s12.5 32.8 0 45.3zM352 544c-17.7 0-32-14.3-32-32s14.3-32 32-32h32c17.7 0 32 14.3 32 32s-14.3 32-32 32zm0-128c-17.7 0-32-14.3-32-32s14.3-32 32-32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32zm0-128c-17.7 0-32-14.3-32-32s14.3-32 32-32h160c17.7 0 32 14.3 32 32s-14.3 32-32 32zm0-128c-17.7 0-32-14.3-32-32s14.3-32 32-32h224c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
+    );
+  } else {
+    path.setAttribute(
+      "d",
+      "M352 96c-17.7 0-32 14.3-32 32s14.3 32 32 32h32c17.7 0 32-14.3 32-32s-14.3-32-32-32zm0 128c-17.7 0-32 14.3-32 32s14.3 32 32 32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32zm0 128c-17.7 0-32 14.3-32 32s14.3 32 32 32h160c17.7 0 32-14.3 32-32s-14.3-32-32-32zm0 128c-17.7 0-32 14.3-32 32s14.3 32 32 32h224c17.7 0 32-14.3 32-32s-14.3-32-32-32zM182.6 105.4c-12.5-12.5-32.8-12.5-45.3 0l-96 96c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l41.4-41.4V512c0 17.7 14.3 32 32 32s32-14.3 32-32V205.3l41.4 41.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-96-96z"
+    );
+  }
+
+  svg.appendChild(path);
+  return svg;
+}
+
+function updateSortChipsUI(animate = true): void {
+  const sortChips = document.querySelectorAll(".marketplace-filter-chip--sort");
+
+  sortChips.forEach(chip => {
+    const label = chip as HTMLLabelElement;
+    const input = label.querySelector("input") as HTMLInputElement;
+    const iconContainer = label.querySelector(".marketplace-filter-chip__icon");
+    const labelSpan = label.querySelector(".marketplace-filter-chip__label");
+
+    if (!iconContainer || !labelSpan) return;
+
+    const isSelected = input.checked;
+    const labelDesc = label.dataset.labelDesc || "";
+    const labelAsc = label.dataset.labelAsc || "";
+
+    iconContainer.replaceChildren();
+
+    if (isSelected) {
+      const icon = createSortIcon(currentFilters.sortDirection);
+      if (animate) {
+        icon.classList.add("sort-direction-icon--animate");
+      }
+      iconContainer.appendChild(icon);
+      labelSpan.textContent = currentFilters.sortDirection === "desc" ? labelDesc : labelAsc;
+      label.setAttribute("aria-pressed", "true");
+      label.setAttribute(
+        "aria-label",
+        `${labelSpan.textContent}, ${currentFilters.sortDirection === "desc" ? "descending" : "ascending"}. Click to reverse.`
+      );
+    } else {
+      labelSpan.textContent = labelDesc;
+      label.setAttribute("aria-pressed", "false");
+      label.removeAttribute("aria-label");
+    }
+  });
+}
+
 function setupMarketplaceFilters(): void {
   const searchInput = document.getElementById("store-search-input") as HTMLInputElement;
-  const sortRadios = document.querySelectorAll('input[name="store-filter-sort"]');
+  const sortChips = document.querySelectorAll(".marketplace-filter-chip--sort");
   const showRadios = document.querySelectorAll('input[name="store-filter-show"]');
   const shaderCheckbox = document.getElementById("store-filter-shaders") as HTMLInputElement;
   const compatibleCheckbox = document.getElementById("store-filter-compatible") as HTMLInputElement;
@@ -373,11 +437,41 @@ function setupMarketplaceFilters(): void {
     applyFiltersToGrid();
   });
 
-  sortRadios.forEach(radio => {
-    radio.addEventListener("change", () => {
-      currentFilters.sortBy = (radio as HTMLInputElement).value as FilterState["sortBy"];
+  sortChips.forEach(chip => {
+    const label = chip as HTMLLabelElement;
+    const input = label.querySelector("input") as HTMLInputElement;
+
+    label.addEventListener("click", e => {
+      e.preventDefault();
+      const newSortBy = input.value as FilterState["sortBy"];
+
+      if (currentFilters.sortBy === newSortBy) {
+        currentFilters.sortDirection = currentFilters.sortDirection === "desc" ? "asc" : "desc";
+      } else {
+        input.checked = true;
+        currentFilters.sortBy = newSortBy;
+        currentFilters.sortDirection = "desc";
+      }
+
       currentPage = 1;
+      updateSortChipsUI();
       applyFiltersToGrid();
+    });
+
+    label.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (input.checked) {
+          currentFilters.sortDirection = currentFilters.sortDirection === "desc" ? "asc" : "desc";
+        } else {
+          input.checked = true;
+          currentFilters.sortBy = input.value as FilterState["sortBy"];
+          currentFilters.sortDirection = "desc";
+        }
+        currentPage = 1;
+        updateSortChipsUI();
+        applyFiltersToGrid();
+      }
     });
   });
 
@@ -400,6 +494,8 @@ function setupMarketplaceFilters(): void {
     currentPage = 1;
     applyFiltersToGrid();
   });
+
+  updateSortChipsUI(false);
 }
 
 function setupPaginationListeners(): void {
@@ -424,14 +520,6 @@ function setupPaginationListeners(): void {
 function scrollToTop(): void {
   const content = document.querySelector(".marketplace-content");
   content?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function updateModifierKeyDisplay(): void {
-  const modKey = isMac ? "⌘" : "Ctrl";
-  const searchModKey = document.getElementById("search-mod-key");
-  const shortcutModKey = document.getElementById("shortcut-mod-key");
-  if (searchModKey) searchModKey.textContent = modKey;
-  if (shortcutModKey) shortcutModKey.textContent = modKey;
 }
 
 function setupShortcutsModalListeners(): void {
@@ -489,12 +577,23 @@ function isInputFocused(): boolean {
   );
 }
 
-function setSortFilter(value: "rating" | "downloads" | "newest"): void {
+function setSortFilter(value: "rating" | "downloads" | "newest", toggleDirection = false): void {
   const radio = document.querySelector(`input[name="store-filter-sort"][value="${value}"]`) as HTMLInputElement;
-  if (radio && !radio.checked) {
+  if (!radio) return;
+
+  if (currentFilters.sortBy === value) {
+    if (toggleDirection) {
+      currentFilters.sortDirection = currentFilters.sortDirection === "desc" ? "asc" : "desc";
+      currentPage = 1;
+      updateSortChipsUI();
+      applyFiltersToGrid();
+    }
+  } else {
     radio.checked = true;
     currentFilters.sortBy = value;
+    currentFilters.sortDirection = "desc";
     currentPage = 1;
+    updateSortChipsUI();
     applyFiltersToGrid();
   }
 }
@@ -521,10 +620,8 @@ function toggleCheckboxFilter(id: string, filterKey: "hasShaders" | "versionComp
 
 function setupMarketplaceKeyboardListeners(): void {
   document.addEventListener("keydown", e => {
-    const modifierKey = isMac ? e.metaKey : e.ctrlKey;
-
-    if ((modifierKey && e.key.toLowerCase() === "k") || e.key === "/") {
-      if (e.key === "/" && isInputFocused()) return;
+    if (e.key === "/") {
+      if (isInputFocused()) return;
       e.preventDefault();
       const searchInput = document.getElementById("store-search-input") as HTMLInputElement;
       searchInput?.focus();
@@ -624,15 +721,15 @@ function setupMarketplaceKeyboardListeners(): void {
         break;
       case "1":
         e.preventDefault();
-        setSortFilter("rating");
+        setSortFilter("rating", true);
         break;
       case "2":
         e.preventDefault();
-        setSortFilter("downloads");
+        setSortFilter("downloads", true);
         break;
       case "3":
         e.preventDefault();
-        setSortFilter("newest");
+        setSortFilter("newest", true);
         break;
     }
   });
@@ -848,18 +945,19 @@ async function applyFiltersToGrid(): Promise<void> {
   visibleCards.sort((a, b) => {
     const statsA = storeStatsCache[a.dataset.themeId || ""] || { installs: 0, rating: 0, ratingCount: 0 };
     const statsB = storeStatsCache[b.dataset.themeId || ""] || { installs: 0, rating: 0, ratingCount: 0 };
+    const directionMultiplier = currentFilters.sortDirection === "desc" ? 1 : -1;
 
     if (currentFilters.sortBy === "downloads") {
-      return statsB.installs - statsA.installs;
+      return (statsB.installs - statsA.installs) * directionMultiplier;
     } else if (currentFilters.sortBy === "rating") {
       if (statsB.rating !== statsA.rating) {
-        return statsB.rating - statsA.rating;
+        return (statsB.rating - statsA.rating) * directionMultiplier;
       }
-      return statsB.ratingCount - statsA.ratingCount;
+      return (statsB.ratingCount - statsA.ratingCount) * directionMultiplier;
     } else if (currentFilters.sortBy === "newest") {
       const indexA = storeThemesCache.findIndex(t => t.id === a.dataset.themeId);
       const indexB = storeThemesCache.findIndex(t => t.id === b.dataset.themeId);
-      return indexB - indexA;
+      return (indexB - indexA) * directionMultiplier;
     }
     return 0;
   });
@@ -1724,6 +1822,7 @@ function resetFilters(): void {
   currentFilters = {
     searchQuery: "",
     sortBy: "rating",
+    sortDirection: "desc",
     showFilter: "all",
     hasShaders: false,
     versionCompatible: true,
@@ -1732,9 +1831,7 @@ function resetFilters(): void {
   const searchInput = document.getElementById("store-search-input") as HTMLInputElement;
   if (searchInput) searchInput.value = "";
 
-  const ratingSortRadio = document.querySelector(
-    'input[name="store-filter-sort"][value="rating"]'
-  ) as HTMLInputElement;
+  const ratingSortRadio = document.querySelector('input[name="store-filter-sort"][value="rating"]') as HTMLInputElement;
   if (ratingSortRadio) ratingSortRadio.checked = true;
 
   const allRadio = document.querySelector('input[name="store-filter-show"][value="all"]') as HTMLInputElement;
@@ -1745,6 +1842,8 @@ function resetFilters(): void {
 
   const compatibleCheckbox = document.getElementById("store-filter-compatible") as HTMLInputElement;
   if (compatibleCheckbox) compatibleCheckbox.checked = true;
+
+  updateSortChipsUI(false);
 }
 
 async function refreshStoreCards(): Promise<void> {

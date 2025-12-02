@@ -162,10 +162,7 @@ export async function fetchThemeShaderConfig(
   }
 }
 
-export async function fetchThemeDescription(
-  repo: string,
-  branchOverride?: string
-): Promise<string | null> {
+export async function fetchThemeDescription(repo: string, branchOverride?: string): Promise<string | null> {
   const branch = branchOverride ?? (await getDefaultBranch(repo));
   const url = getRawGitHubUrl(repo, branch, "DESCRIPTION.md");
 

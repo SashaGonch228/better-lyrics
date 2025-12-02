@@ -220,6 +220,52 @@
   color: rgb(165, 180, 252);
 }
 
+.marketplace-filter-chip--sort {
+  cursor: pointer;
+}
+
+.marketplace-filter-chip__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  margin-right: -0.375rem;
+  overflow: hidden;
+  transition: width 0.15s ease, margin-right 0.15s ease;
+}
+
+.marketplace-filter-chip--sort:has(input:checked) .marketplace-filter-chip__icon {
+  width: 1rem;
+  margin-right: 0;
+}
+
+.marketplace-filter-chip__icon .sort-direction-icon {
+  flex-shrink: 0;
+}
+
+.marketplace-filter-chip__icon .sort-direction-icon--animate {
+  animation: sort-icon-flip 0.25s ease-out;
+}
+
+@keyframes sort-icon-flip {
+  0% {
+    transform: scaleY(-1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.marketplace-filter-chip__label {
+  transition: color 0.15s ease;
+}
+
 .marketplace-content {
   flex: 1;
   min-height: 400px;
@@ -1531,6 +1577,13 @@ kbd.kbd-icon svg {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.5rem;
+}
+
+.shortcuts-group-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.8;
 }
 
 .shortcut-item {
