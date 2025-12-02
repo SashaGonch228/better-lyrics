@@ -37,6 +37,7 @@
         "@codemirror/search": "^6.5.11",
         "@codemirror/state": "^6.5.2",
         "@codemirror/view": "^6.38.4",
+        "@formkit/auto-animate": "^0.9.0",
         "@fsegurai/codemirror-theme-material-dark": "^6.2.2",
         "codemirror": "^5.65.20",
         "extension": "2.1.3",

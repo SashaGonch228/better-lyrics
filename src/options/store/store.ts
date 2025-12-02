@@ -1,5 +1,8 @@
 import { marked } from "marked";
+import autoAnimate, { type AnimationController } from "@formkit/auto-animate";
 import type { StoreTheme, InstalledStoreTheme, AllThemeStats, ThemeStats } from "./types";
+
+let gridAnimationController: AnimationController | null = null;
 import {
   checkStorePermissions,
   requestStorePermissions,
@@ -469,13 +472,27 @@ async function loadMarketplace(): Promise<void> {
       return;
     }
 
-    for (const theme of storeThemesCache) {
+    storeThemesCache.forEach((theme, index) => {
       const themeStats = storeStatsCache[theme.id];
       const card = createStoreThemeCard(theme, installedIds.has(theme.id), themeStats);
+      card.style.animationDelay = `${index * 25}ms`;
+      card.classList.add("card-initial");
+      card.addEventListener(
+        "animationend",
+        () => {
+          card.classList.remove("card-initial");
+          card.style.animationDelay = "";
+        },
+        { once: true }
+      );
       grid.appendChild(card);
-    }
+    });
 
     applyFiltersToGrid();
+
+    requestAnimationFrame(() => {
+      gridAnimationController = autoAnimate(grid, { duration: 200, easing: "cubic-bezier(0.2, 0, 0, 1)" });
+    });
   } catch (err) {
     console.error("[Marketplace] Failed to load themes:", err);
     if (loading) loading.style.display = "none";
@@ -488,10 +505,15 @@ async function loadMarketplace(): Promise<void> {
 }
 
 async function refreshMarketplace(): Promise<void> {
+  if (gridAnimationController) {
+    gridAnimationController.disable();
+    gridAnimationController = null;
+  }
   const grid = document.getElementById("store-modal-grid");
   if (grid) grid.replaceChildren();
   storeThemesCache = [];
   storeStatsCache = {};
+  hiddenCards.clear();
   resetFilters();
   await loadMarketplace();
 }
@@ -572,6 +594,8 @@ function setupThemeChangeListener(): void {
   });
 }
 
+const hiddenCards = new Map<string, HTMLElement>();
+
 async function applyFiltersToGrid(): Promise<void> {
   const grid = document.getElementById("store-modal-grid");
   if (!grid) return;
@@ -579,16 +603,9 @@ async function applyFiltersToGrid(): Promise<void> {
   const installedThemes = await getInstalledStoreThemes();
   const installedIds = new Set(installedThemes.map(t => t.id));
 
-  const cards = Array.from(grid.querySelectorAll(".store-card")) as HTMLElement[];
-  const filteredCards: HTMLElement[] = [];
+  const visibleCards: HTMLElement[] = [];
 
-  cards.forEach(card => {
-    const themeId = card.dataset.themeId;
-    if (!themeId) return;
-
-    const theme = storeThemesCache.find(t => t.id === themeId);
-    if (!theme) return;
-
+  storeThemesCache.forEach(theme => {
     const matchesSearch = matchesSearchQuery(theme, currentFilters.searchQuery);
     const matchesShowFilter = matchesInstallFilter(theme.id, installedIds, currentFilters.showFilter);
     const matchesShaderFilter = !currentFilters.hasShaders || theme.hasShaders;
@@ -597,16 +614,28 @@ async function applyFiltersToGrid(): Promise<void> {
 
     const matchesFilters = matchesSearch && matchesShowFilter && matchesShaderFilter && matchesVersionFilter;
 
+    let card = grid.querySelector(`.store-card[data-theme-id="${theme.id}"]`) as HTMLElement | null;
+    if (!card) {
+      card = hiddenCards.get(theme.id) || null;
+    }
+
+    if (!card) return;
+
     if (matchesFilters) {
-      card.classList.remove("filtered-out");
-      filteredCards.push(card);
+      if (!card.parentElement) {
+        grid.appendChild(card);
+        hiddenCards.delete(theme.id);
+      }
+      visibleCards.push(card);
     } else {
-      card.classList.add("filtered-out");
-      card.style.display = "none";
+      if (card.parentElement) {
+        card.remove();
+        hiddenCards.set(theme.id, card);
+      }
     }
   });
 
-  filteredCards.sort((a, b) => {
+  visibleCards.sort((a, b) => {
     const statsA = storeStatsCache[a.dataset.themeId || ""] || { installs: 0, rating: 0, ratingCount: 0 };
     const statsB = storeStatsCache[b.dataset.themeId || ""] || { installs: 0, rating: 0, ratingCount: 0 };
 
@@ -625,31 +654,32 @@ async function applyFiltersToGrid(): Promise<void> {
     return 0;
   });
 
-  filteredCards.forEach(card => grid.appendChild(card));
+  visibleCards.forEach(card => grid.appendChild(card));
 
-  if (isMarketplacePage && filteredCards.length > ITEMS_PER_PAGE) {
-    const totalPages = Math.ceil(filteredCards.length / ITEMS_PER_PAGE);
+  if (isMarketplacePage && visibleCards.length > ITEMS_PER_PAGE) {
+    const totalPages = Math.ceil(visibleCards.length / ITEMS_PER_PAGE);
     if (currentPage > totalPages) currentPage = totalPages;
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
 
-    filteredCards.forEach((card, index) => {
-      card.style.display = index >= startIndex && index < endIndex ? "" : "none";
+    visibleCards.forEach((card, index) => {
+      if (index >= startIndex && index < endIndex) {
+        if (!card.parentElement) grid.appendChild(card);
+      } else {
+        if (card.parentElement) card.remove();
+      }
     });
 
-    updatePaginationUI(filteredCards.length, totalPages);
+    updatePaginationUI(visibleCards.length, totalPages);
   } else {
-    filteredCards.forEach(card => {
-      card.style.display = "";
-    });
     hidePagination();
   }
 
   const existingEmpty = grid.querySelector(".store-empty");
   if (existingEmpty) existingEmpty.remove();
 
-  if (filteredCards.length === 0 && storeThemesCache.length > 0) {
+  if (visibleCards.length === 0 && storeThemesCache.length > 0) {
     const emptyMsg = document.createElement("p");
     emptyMsg.className = "store-empty";
     emptyMsg.textContent = "No themes match your filters";
