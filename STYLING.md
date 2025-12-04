@@ -228,8 +228,6 @@ The lyrics use a hierarchical structure with specific class names:
 - `.blyrics--break` - Line break elements within a line
 - `.blyrics-background-lyric` - Background vocal elements
 
-Each lyric line is a `<div>` with the `.blyrics--line` class, containing `<span>` elements with the `.blyrics--word` class for individual words.
-
 ### Base Styling for Each Lyric
 
 ```css
