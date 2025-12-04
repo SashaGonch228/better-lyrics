@@ -175,7 +175,6 @@ export async function fillTtml(responseString: string, providerParameters: Provi
   providerParameters.sourceMap["bLyrics-richsynced"].filled = true;
 }
 
-
 export default async function bLyrics(providerParameters: ProviderParameters): Promise<void> {
   // Fetch from the primary API if cache is empty or invalid
   const url = new URL(Constants.LYRICS_API_URL);

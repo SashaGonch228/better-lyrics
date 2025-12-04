@@ -75,7 +75,7 @@ export type CubeyLyricSourceResult = LyricSourceResult & {
 
 import * as Utils from "@core/utils";
 import { lrcFixers, parseLRC, parsePlainLyrics } from "./lrcUtils";
-import {fillTtml} from "@modules/lyrics/providers/blyrics/blyrics";
+import { fillTtml } from "@modules/lyrics/providers/blyrics/blyrics";
 
 /**
  *
@@ -290,7 +290,16 @@ export default async function cubey(providerParameters: ProviderParameters): Pro
     await fillTtml(ttmlData.ttml, providerParameters);
   }
 
-  (["musixmatch-synced", "musixmatch-richsync", "lrclib-synced", "lrclib-plain", "bLyrics-richsynced", "bLyrics-synced"] as const).forEach(source => {
+  (
+    [
+      "musixmatch-synced",
+      "musixmatch-richsync",
+      "lrclib-synced",
+      "lrclib-plain",
+      "bLyrics-richsynced",
+      "bLyrics-synced",
+    ] as const
+  ).forEach(source => {
     providerParameters.sourceMap[source].filled = true;
   });
 }
