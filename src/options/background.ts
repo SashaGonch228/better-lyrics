@@ -1,10 +1,10 @@
 /**
  * Handles runtime messages from extension components.
- * Processes CSS updates for YouTube Music tabs and settings updates.
+ * Processes style updates for YouTube Music tabs and settings updates.
  *
  * @param {Object} request - The message request object
- * @param {string} request.action - The action type ('updateCSS' or 'updateSettings')
- * @param {string} [request.css] - CSS content for updateCSS action
+ * @param {string} request.action - The action type ('applyStyles' or 'updateSettings')
+ * @param {string} [request.ricsSource] - RICS source code for applyStyles action
  * @param {Object} [request.settings] - Settings object for updateSettings action
  * @returns {boolean} Returns true to indicate asynchronous response
  */
@@ -66,11 +66,11 @@ chrome.alarms.onAlarm.addListener(alarm => {
 });
 
 chrome.runtime.onMessage.addListener(request => {
-  if (request.action === "updateCSS") {
+  if (request.action === "applyStyles") {
     chrome.tabs.query({ url: "*://music.youtube.com/*" }, tabs => {
       tabs.forEach(tab => {
         if (tab.id != null) {
-          chrome.tabs.sendMessage(tab.id, { action: "updateCSS", css: request.css }).catch(() => {});
+          chrome.tabs.sendMessage(tab.id, { action: "applyStyles", ricsSource: request.ricsSource }).catch(() => {});
         }
       });
     });

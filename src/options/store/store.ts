@@ -45,6 +45,7 @@ let storeStatsCache: AllThemeStats = {};
 let userRatingsCache: Record<string, number> = {};
 let userInstallsCache: Record<string, boolean> = {};
 let urlOnlyThemeCards: Map<string, HTMLElement> = new Map();
+let installOperationInProgress = false;
 
 function getUrlOnlyThemes(installedThemes: InstalledStoreTheme[], marketplaceIds: Set<string>): InstalledStoreTheme[] {
   return installedThemes.filter(t => t.source === "url" && !marketplaceIds.has(t.id));
@@ -1594,6 +1595,7 @@ async function openDetailModal(theme: StoreTheme, urlThemeInfo?: UrlThemeInfo): 
       };
 
       (btn as HTMLButtonElement).onclick = async () => {
+        const previousRating = currentRating;
         updateStarDisplay(rating, false);
         currentRating = rating;
 
@@ -1630,6 +1632,8 @@ async function openDetailModal(theme: StoreTheme, urlThemeInfo?: UrlThemeInfo): 
             }
           }
         } else {
+          currentRating = previousRating;
+          updateStarDisplay(previousRating, false);
           ratingStatusEl.textContent = error || "Failed to submit rating";
           ratingStatusEl.className = "detail-rating-status error";
         }
@@ -1643,6 +1647,8 @@ async function openDetailModal(theme: StoreTheme, urlThemeInfo?: UrlThemeInfo): 
     actionBtn.className = `store-card-btn ${initialInstalled ? "store-card-btn-remove" : "store-card-btn-install"}`;
     setActionButtonContent(actionBtn, initialInstalled ? "Remove" : "Install", "I");
     actionBtn.onclick = async () => {
+      if (installOperationInProgress) return;
+      installOperationInProgress = true;
       actionBtn.disabled = true;
       const isRemoveButton = actionBtn.classList.contains("store-card-btn-remove");
       try {
@@ -1688,6 +1694,7 @@ async function openDetailModal(theme: StoreTheme, urlThemeInfo?: UrlThemeInfo): 
         setActionButtonContent(actionBtn, isRemoveButton ? "Remove" : "Install", "I");
         showAlert(`Failed: ${err}`);
       } finally {
+        installOperationInProgress = false;
         actionBtn.disabled = false;
       }
     };

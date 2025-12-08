@@ -26,7 +26,7 @@ export function decompressString(data: string): string {
     }
     return strFromU8(gunzipSync(bytes));
   } catch {
-    return data.slice(COMPRESSED_PREFIX.length);
+    return data;
   }
 }
 

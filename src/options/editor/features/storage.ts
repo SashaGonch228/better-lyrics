@@ -275,32 +275,24 @@ export function showSyncError(error: any): void {
   }, 7000);
 }
 
-export async function sendUpdateMessage(sourceCode: string, strategy: "local" | "sync" | "chunked"): Promise<void> {
-  const compiledCSS = ricsCompiler.getCompiledCSS(sourceCode);
-  console.log(
-    LOG_PREFIX_EDITOR,
-    `sendUpdateMessage called, source length: ${sourceCode.length}, compiled CSS length: ${compiledCSS.length}, strategy: ${strategy}`
-  );
+export async function broadcastRICSToTabs(ricsSource: string, strategy: "local" | "sync" | "chunked"): Promise<void> {
+  console.log(LOG_PREFIX_EDITOR, `Broadcasting RICS to tabs, source length: ${ricsSource.length}, strategy: ${strategy}`);
   try {
     chrome.runtime
       .sendMessage({
-        action: "updateCSS",
-        css: compiledCSS,
+        action: "applyStyles",
+        ricsSource,
         storageType: strategy,
       })
       .then(() => {
-        console.log(LOG_PREFIX_EDITOR, "Message sent to background successfully");
+        console.log(LOG_PREFIX_EDITOR, "Broadcast sent to background successfully");
       })
       .catch(error => {
-        console.log(LOG_PREFIX_EDITOR, "Error sending message to background:", error);
+        console.log(LOG_PREFIX_EDITOR, "Error broadcasting to background:", error);
       });
   } catch (err) {
-    console.log(LOG_PREFIX_EDITOR, "sendUpdateMessage exception:", err);
+    console.log(LOG_PREFIX_EDITOR, "broadcastRICSToTabs exception:", err);
   }
-}
-
-export function broadcastCSS(sourceCode: string): void {
-  chrome.runtime.sendMessage({ action: "updateCSS", css: sourceCode }).catch(() => {});
 }
 
 export interface ApplyStoreThemeOptions {
@@ -330,7 +322,7 @@ export async function applyStoreThemeComplete(options: ApplyStoreThemeOptions): 
     });
     document.dispatchEvent(event);
 
-    broadcastCSS(themeContent);
+    await broadcastRICSToTabs(themeContent, saveResult.strategy || "sync");
 
     return true;
   } catch (err) {
@@ -480,7 +472,7 @@ export class StorageManager {
       const result = await saveToStorageWithFallback(themeContent, true);
       if (result.success && result.strategy) {
         showSyncSuccess(result.strategy, result.wasRetry);
-        await sendUpdateMessage(themeContent, result.strategy);
+        await broadcastRICSToTabs(themeContent, result.strategy);
         console.log(LOG_PREFIX_EDITOR, "Store theme update synced to customCSS");
       }
     });

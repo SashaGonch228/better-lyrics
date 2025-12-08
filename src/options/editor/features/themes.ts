@@ -19,7 +19,7 @@ import {
   themeSelectorBtn,
 } from "../ui/dom";
 import { showAlert, showConfirm, showPrompt } from "../ui/feedback";
-import { saveToStorageWithFallback, sendUpdateMessage, showSyncError, showSyncSuccess } from "./storage";
+import { broadcastRICSToTabs, saveToStorageWithFallback, showSyncError, showSyncSuccess } from "./storage";
 
 const STORE_THEME_PREFIX = "store:";
 
@@ -169,7 +169,7 @@ export class ThemeManager {
       }
 
       showSyncSuccess(result.strategy, result.wasRetry);
-      await sendUpdateMessage(css, result.strategy);
+      await broadcastRICSToTabs(css, result.strategy);
     } finally {
       editorStateManager.setIsSaving(false);
       editorStateManager.resetSaveCount();
@@ -364,7 +364,7 @@ export function saveToStorage(isTheme = false) {
       console.log(LOG_PREFIX_EDITOR, "saveToStorageWithFallback result:", result);
       if (result.success && result.strategy) {
         showSyncSuccess(result.strategy, result.wasRetry);
-        sendUpdateMessage(css, result.strategy);
+        broadcastRICSToTabs(css, result.strategy);
       } else {
         throw result.error;
       }

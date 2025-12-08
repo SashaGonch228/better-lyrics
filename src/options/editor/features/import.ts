@@ -1,6 +1,6 @@
 import { editorStateManager } from "../core/state";
 import { showAlert } from "../ui/feedback";
-import { saveToStorageWithFallback, sendUpdateMessage, showSyncSuccess } from "./storage";
+import { broadcastRICSToTabs, saveToStorageWithFallback, showSyncSuccess } from "./storage";
 import { hideThemeName, updateThemeSelectorButton } from "./themes";
 
 export const generateDefaultFilename = (): string => {
@@ -130,7 +130,7 @@ export class ImportManager {
 
         console.log(`[ImportManager] Step 5: Sending update message`);
         showSyncSuccess(result.strategy, result.wasRetry);
-        await sendUpdateMessage(css, result.strategy);
+        await broadcastRICSToTabs(css, result.strategy);
 
         console.log(`[ImportManager] Import completed successfully`);
         showAlert(`Theme file "${filename}" imported successfully!`);

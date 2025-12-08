@@ -162,19 +162,19 @@ export function hideCursorOnIdle(): void {
 export function listenForPopupMessages(): void {
   chrome.runtime.onMessage.addListener((request, _, sendResponse) => {
     Utils.log(Constants.LOG_PREFIX_CONTENT, "Received message:", request.action);
-    if (request.action === "updateCSS") {
-      Utils.log(Constants.LOG_PREFIX_CONTENT, "Processing updateCSS, CSS length:", request.css?.length);
-      if (request.css) {
-        Utils.log(Constants.LOG_PREFIX_CONTENT, "Compiling and applying CSS");
-        const compiledCSS = Storage.compileRicsToCSS(request.css);
+    if (request.action === "applyStyles") {
+      Utils.log(Constants.LOG_PREFIX_CONTENT, "Processing applyStyles, RICS length:", request.ricsSource?.length);
+      if (request.ricsSource) {
+        Utils.log(Constants.LOG_PREFIX_CONTENT, "Compiling RICS and applying styles");
+        const compiledCSS = Storage.compileRicsToCSS(request.ricsSource);
         Utils.applyCustomCSS(compiledCSS);
         calculateLyricPositions();
-        Utils.log(Constants.LOG_PREFIX_CONTENT, "CSS applied successfully");
+        Utils.log(Constants.LOG_PREFIX_CONTENT, "Styles applied successfully");
       } else {
-        Utils.log(Constants.LOG_PREFIX_CONTENT, "Loading CSS from storage");
+        Utils.log(Constants.LOG_PREFIX_CONTENT, "Loading styles from storage");
         Storage.getAndApplyCustomCSS().then(() => {
           calculateLyricPositions();
-          Utils.log(Constants.LOG_PREFIX_CONTENT, "CSS loaded from storage and applied");
+          Utils.log(Constants.LOG_PREFIX_CONTENT, "Styles loaded from storage and applied");
         });
       }
     } else if (request.action === "updateSettings") {
