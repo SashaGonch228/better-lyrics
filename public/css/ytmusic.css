@@ -244,7 +244,7 @@ ytmusic-player-page:not([is-mweb-modernization-enabled])[player-fullscreened]
     width: var(--blyrics-fullscreen-panel-size);
   }
 
-  ytmusic-player-page:not([is-mweb-modernization-enabled])[player-fullscreened][video-mode]
+  ytmusic-player-page:not([is-mweb-modernization-enabled]):is([player-fullscreened], [video-mode])
   #side-panel {
     width: var(--blyrics-fullscreen-video-panel-size);
   }
