@@ -32,5 +32,8 @@ const jsFiles = findFiles(`./dist/${browser}`, ".js");
 jsFiles.forEach(file => {
   const fileName = path.basename(file);
   const sourceMappingURL = `\n//# sourceMappingURL=https://blyrics-sourcemaps.dacubeking.com/${browser}/v${version}/${fileName}.map`;
-  fs.appendFileSync(file, sourceMappingURL);
+  let fileString = fs.readFileSync(file, "utf-8");
+  // Replace the sourceMappingURL at the bottom:
+  fileString = fileString.replace(/\/\/# sourceMappingURL=.*\.map$/, sourceMappingURL);
+  fs.writeFileSync(file, fileString);
 });

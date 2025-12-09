@@ -19,7 +19,7 @@ try {
     execSync(`tsx tooling/patch-sourcemaps.js ${browser}`, { stdio: "inherit" });
 
     console.log(`Uploading sourcemaps for ${browser}...`);
-    execSync(`tsx tooling/upload-sourcemaps.js ${browser}`, { stdio: "inherit" });
+    execSync(`tsx tooling/upload-sourcemaps.ts ${browser}`, { stdio: "inherit" });
   }
 } catch (error) {
   console.error("Build and patch process failed:", error);

@@ -3,10 +3,8 @@ module.exports = {
     browser: "chrome",
   },
   config: (config) => {
-    return {
-      ...config,
-      devtool: "hidden-source-map",
-    }
+    config.devtool = "source-map";
+    return config;
   },
   browser: {
     chrome: {
