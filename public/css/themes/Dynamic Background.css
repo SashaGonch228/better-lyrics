@@ -1,6 +1,5 @@
 /* ========== README README README README README ========== */
 
-
 /* ========== 
 If you want to modify something, I’ve left instructions marked with “ ^^ ” at the start and end of each guide. Please make sure to find the end marker before editing anything.  
 For easier editing, it’s recommended to open this theme in a new tab, as long lines may wrap and become harder to follow.
@@ -494,12 +493,6 @@ Note: The background animation may be CPU-intensive on your PC.
         padding-top: var(--ytmusic-nav-bar-height);
         padding-left: var(--ytmusic-guide-width);
         padding-bottom: var(--ytmusic-player-bar-height);
-    }
-
-    /* Re-position back to how it was */
-    ytmusic-player-page:not([is-video-truncation-fix-enabled])[player-fullscreened]:not([blyrics-dfs]) #player.ytmusic-player-page,
-    ytmusic-player-page:not([is-video-truncation-fix-enabled])[player-fullscreened]:not([blyrics-dfs]) #blyrics-song-info {
-        top: 50%;
     }
 
     ytmusic-app-layout:not([is-mweb-modernization-enabled])[player-fullscreened]:not([blyrics-dfs]) > [slot=player-page] {
