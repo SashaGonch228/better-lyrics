@@ -716,11 +716,16 @@ hr {
 }
 
 .sortable-item.disabled-item {
-    color: rgba(255, 255, 255, 0.5);
+	color: rgba(255, 255, 255, 0.5);
 }
 
 .sortable-item.disabled-item .sync-tag {
-    opacity: 0.5;
+	opacity: 0.5;
+	cursor: default;
+}
+
+.sortable-item.disabled-item .sync-tag::after {
+	display: none;
 }
 
 .checkbox-container {
