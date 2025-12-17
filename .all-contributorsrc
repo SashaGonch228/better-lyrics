@@ -106,6 +106,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "mukeenanyafiq",
+      "name": "Keenan Yafiq",
+      "avatar_url": "https://avatars.githubusercontent.com/u/93072673?v=4",
+      "profile": "http://github.com/mukeenanyafiq",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "badgeTemplate": "<img src=\"https://img.shields.io/badge/all_contributors-<%= contributors.length %>-orange.svg\" alt=\"\"/>",
