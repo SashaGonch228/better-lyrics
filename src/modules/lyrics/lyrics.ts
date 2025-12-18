@@ -18,7 +18,6 @@ import type { SegmentMap } from "./requestSniffer";
 import * as RequestSniffer from "./requestSniffer";
 import * as RequestSniffing from "./requestSniffer";
 import * as Translation from "./translation";
-import { animEngineState } from "@modules/ui/animationEngine";
 
 export type LyricSourceResultWithMeta = LyricSourceResult & {
   song: string;
@@ -51,16 +50,10 @@ export function applySegmentMapToLyrics(lyricData: LyricsData | null, segmentMap
 
         let changeS = lastTimeChange / 1000;
         lyric.time = lyric.time + changeS;
+        lyric.lyricElement.dataset.time = String(lyric.time);
         lyric.parts.forEach(part => {
           part.time = part.time + changeS;
-        });
-
-        lyric.lyricElement.setAttribute(
-          "onClick",
-          `const player = document.getElementById("movie_player"); player.seekTo(${lyric.time}, true);player.playVideo();`
-        );
-        lyric.lyricElement.addEventListener("click", _e => {
-          animEngineState.scrollResumeTime = 0;
+          part.lyricElement.dataset.time = String(part.time);
         });
       }
     }

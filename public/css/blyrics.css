@@ -217,6 +217,7 @@
 	left: -2rem;
 	white-space: pre-wrap;
 	padding: 2rem;
+	pointer-events: none;
 	/*color: var(--blyrics-lyric-active-color);*/
 	color: transparent;
 	box-sizing: content-box;
