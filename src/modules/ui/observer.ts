@@ -241,33 +241,38 @@ export function setupHomepageFullscreenHandler(): void {
         return;
       }
 
-      if (isPlayerPageOpen()) {
-        return;
-      }
-
-      if (!AppState.lastVideoId) {
-        return;
-      }
-
-      if (isNavigating()) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      openPlayerPageForFullscreen().then(() => {
-        triggerFullscreen();
-      });
+      interceptFullscreenAction(event);
     },
     { capture: true }
   );
 
   setupFullscreenExitListener();
+  setupMiniplayerFullscreenHandler();
+}
+
+function interceptFullscreenAction(event: Event): void {
+  if (isPlayerPageOpen()) {
+    return;
+  }
+
+  if (!AppState.lastVideoId) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (event instanceof KeyboardEvent) {
+    event.stopImmediatePropagation();
+  }
+
+  if (isNavigating()) {
+    return;
+  }
+
+  openPlayerPageForFullscreen().then(() => {
+    triggerFullscreen();
+  });
 }
 
 function setupFullscreenExitListener(): void {
@@ -309,4 +314,14 @@ function triggerFullscreen(): void {
     });
     document.dispatchEvent(keyEvent);
   }
+}
+
+function setupMiniplayerFullscreenHandler(): void {
+  const fullscreenButton = document.querySelector("#song-media-window .fullscreen-button") as HTMLElement;
+  if (!fullscreenButton) {
+    setTimeout(setupMiniplayerFullscreenHandler, 1000);
+    return;
+  }
+
+  fullscreenButton.addEventListener("click", interceptFullscreenAction, { capture: true });
 }
