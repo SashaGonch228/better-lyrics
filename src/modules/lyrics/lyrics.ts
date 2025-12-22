@@ -18,7 +18,6 @@ import type { SegmentMap } from "./requestSniffer";
 import * as RequestSniffer from "./requestSniffer";
 import * as RequestSniffing from "./requestSniffer";
 import * as Translation from "./translation";
-import { animEngineState } from "@modules/ui/animationEngine";
 
 export type LyricSourceResultWithMeta = LyricSourceResult & {
   song: string;
@@ -27,6 +26,7 @@ export type LyricSourceResultWithMeta = LyricSourceResult & {
   duration: number;
   videoId: string;
   segmentMap: SegmentMap | null;
+  providerKey?: string;
 };
 
 export function applySegmentMapToLyrics(lyricData: LyricsData | null, segmentMap: SegmentMap) {
@@ -51,16 +51,10 @@ export function applySegmentMapToLyrics(lyricData: LyricsData | null, segmentMap
 
         let changeS = lastTimeChange / 1000;
         lyric.time = lyric.time + changeS;
+        lyric.lyricElement.dataset.time = String(lyric.time);
         lyric.parts.forEach(part => {
           part.time = part.time + changeS;
-        });
-
-        lyric.lyricElement.setAttribute(
-          "onClick",
-          `const player = document.getElementById("movie_player"); player.seekTo(${lyric.time}, true);player.playVideo();`
-        );
-        lyric.lyricElement.addEventListener("click", _e => {
-          animEngineState.scrollResumeTime = 0;
+          part.lyricElement.dataset.time = String(part.time);
         });
       }
     }
@@ -108,6 +102,7 @@ export async function createLyrics(detail: PlayerDetails, signal: AbortSignal): 
     DOM.renderLoader(); // Only render the loader after we've checked the cache & we're not switching between audio and video
     Translation.clearCache();
     matchingSong = await RequestSniffer.getMatchingSong(videoId);
+    segmentMap = matchingSong?.segmentMap || null;
     AppState.areLyricsLoaded = false;
     AppState.areLyricsTicking = false;
   }
@@ -203,6 +198,8 @@ export async function createLyrics(detail: PlayerDetails, signal: AbortSignal): 
     Utils.log(err);
   }
 
+  let selectedProvider: string | undefined;
+
   for (let provider of LyricProviders.providerPriority) {
     if (signal.aborted) {
       return;
@@ -229,6 +226,7 @@ export async function createLyrics(detail: PlayerDetails, signal: AbortSignal): 
           }
         }
         lyrics = sourceLyrics;
+        selectedProvider = provider;
         break;
       }
     } catch (err) {
@@ -271,6 +269,7 @@ export async function createLyrics(detail: PlayerDetails, signal: AbortSignal): 
     duration: providerParameters.duration,
     videoId: providerParameters.videoId,
     segmentMap,
+    providerKey: selectedProvider,
     ...lyrics,
   };
 
