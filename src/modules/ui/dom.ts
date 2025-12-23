@@ -185,7 +185,7 @@ export function createFooter(song: string, artist: string, album: string, durati
     const geniusContainer = document.createElement("div");
     geniusContainer.className = `${Constants.FOOTER_CLASS}__container`;
 
-    const searchQuery = encodeURIComponent(`${artist.trim()} - ${song}`);
+    const searchQuery = encodeURIComponent(`${artist.trim()} - ${song.trim()}`);
     const geniusSearchUrl = `https://genius.com/search?q=${searchQuery}`;
 
     const geniusLink = document.createElement("a");
