@@ -16,7 +16,6 @@ jobs:
 
       - name: Bypass Cloudflare for GitHub Action
         uses: xiaotianxt/bypass-cloudflare-for-github-action@v2.0.1
-        continue-on-error: true
         with:
           cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
           cf_zone_id: ${{ secrets.CF_ZONE_ID }}
@@ -25,7 +24,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20.x'
+          node-version: "20.x"
 
       - name: Get version and hash
         id: version
