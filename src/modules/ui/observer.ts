@@ -19,11 +19,7 @@ import {
   openPlayerPageForFullscreen,
   closePlayerPageIfOpenedForFullscreen,
 } from "@modules/ui/navigation";
-import {
-  FULLSCREEN_BUTTON_SELECTOR,
-  GENERAL_ERROR_LOG,
-  LYRICS_WRAPPER_ID,
-} from "@constants";
+import { FULLSCREEN_BUTTON_SELECTOR, GENERAL_ERROR_LOG, LYRICS_WRAPPER_ID } from "@constants";
 
 let wakeLock: WakeLockSentinel | null = null;
 
