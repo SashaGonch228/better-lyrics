@@ -1,12 +1,12 @@
 {
     "type": "module",
     "name": "better-lyrics",
-    "version": "2.0.5.9",
+    "version": "2.0.5.10",
     "description": "Enhance YouTube Music with beautiful time-synced lyrics, multilingual support, real-time translations and more",
     "main": "index.js",
     "scripts": {
         "dev": "extension dev --browser chrome --polyfill",
-				"dev:firefox": "extension dev --browser firefox --polyfill",
+        "dev:firefox": "extension dev --browser firefox --polyfill",
         "dev:brave": "extension dev --chromium-binary \"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser\" --polyfill",
         "start": "extension start --polyfill",
         "build": "extension build --browser all --polyfill",
