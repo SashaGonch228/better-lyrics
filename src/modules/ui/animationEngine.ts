@@ -243,6 +243,7 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
           });
 
           lineData.isAnimating = true;
+          lineData.isAnimationPlayStatePlaying = true;
           lineData.accumulatedOffsetMs = 0;
         }
 
