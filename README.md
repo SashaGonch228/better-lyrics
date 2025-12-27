@@ -8,7 +8,7 @@ Better Lyrics upgrades your YouTube Music experience by providing beautiful time
 
 <p align="left">
  <a aria-label="License" href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img src="https://img.shields.io/badge/license-GPL_v3-blue.svg" alt=""/></a>
- <img src="https://img.shields.io/badge/version-2.1.2-blue.svg" alt=""/>
+ <img src="https://img.shields.io/badge/version-2.1.3-blue.svg" alt=""/>
 
  <img src="https://img.shields.io/badge/status-active-brightgreen.svg" alt=""/>
  <a aria-label="Volkswagen CI" href="https://github.com/better-lyrics/better-lyrics"><img src="https://auchenberg.github.io/volkswagen/volkswargen_ci.svg?v=1" alt=""/></a>
