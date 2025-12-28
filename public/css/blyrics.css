@@ -785,7 +785,8 @@
 
 .blyrics--instrumental.blyrics--animating .blyrics--wave-clip {
 	transition-property: transform;
-	transition-duration: calc(var(--blyrics-duration, 1ms) * 1.25);
+	transition-duration: calc(var(--blyrics-duration, 1ms) * 1.041666667);
+	transition-timing-function: linear;
 	transition-delay: var(--blyrics-anim-delay);
 	transform: translateY(-3.25%);
 }
