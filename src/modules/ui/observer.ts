@@ -1,14 +1,14 @@
 import {
   AUTO_SWITCH_ENABLED_LOG,
   FULLSCREEN_BUTTON_SELECTOR,
-  GENERAL_ERROR_LOG,
+  GENERAL_ERROR_LOG, LYRICS_CLASS,
   LYRICS_TAB_CLICKED_LOG,
   LYRICS_WRAPPER_ID,
   PAUSING_LYRICS_SCROLL_LOG,
   SONG_SWITCHED_LOG,
   TAB_CONTENT_CLASS,
   TAB_HEADER_CLASS,
-  TAB_RENDERER_SELECTOR,
+  TAB_RENDERER_SELECTOR, USER_SCROLLING_CLASS,
 } from "@constants";
 import { AppState, handleModifications, reloadLyrics, type PlayerDetails } from "@core/appState";
 import { onAutoSwitchEnabled, onFullScreenDisabled } from "@modules/settings/settings";
@@ -320,6 +320,12 @@ export function scrollEventHandler(): void {
       log(PAUSING_LYRICS_SCROLL_LOG);
     }
     animEngineState.scrollResumeTime = Date.now() + 25000;
+    if (!animEngineState.wasUserScrolling) {
+      getResumeScrollElement().removeAttribute("autoscroll-hidden");
+      const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
+      lyricsElement.classList.add(USER_SCROLLING_CLASS);
+      animEngineState.wasUserScrolling = true;
+    }
   }
 }
 
