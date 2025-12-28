@@ -3,6 +3,7 @@ import {
   ALBUM_ART_ADDED_FROM_MUTATION_LOG,
   ALBUM_ART_ADDED_LOG,
   ALBUM_ART_REMOVED_LOG,
+  ALBUM_ART_SIZE_CHANGED,
   DISCORD_INVITE_URL,
   DISCORD_LOGO_SRC,
   FONT_LINK,
@@ -718,6 +719,8 @@ export function setAlbumArtSize(size: string): void {
   img.onload = () => {
     albumArt.src = img.src;
   }
+  
+  log(ALBUM_ART_SIZE_CHANGED, size)
 }
 
 /**
