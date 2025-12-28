@@ -97,8 +97,7 @@ Settings are organized into tabs in the extension popup:
 | ------------------------- | -------- |
 | Show logs                 | Enabled  |
 | Auto switch to Lyrics tab | Disabled |
-
-| Cache Details | - |
+| Cache Details             | -        |
 
 ### Display
 
