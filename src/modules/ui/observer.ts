@@ -25,7 +25,7 @@ import {
 import { getSongMetadata } from "@modules/lyrics/requestSniffer/requestSniffer";
 import { preFetchLyrics } from "@modules/lyrics/lyrics";
 import { log } from "@utils";
-import { addAlbumArtToLayout, cleanup, injectSongAttributes, isLoaderActive, renderLoader } from "./dom";
+import { addAlbumArtToLayout, cleanup, injectSongAttributes, isLoaderActive, renderLoader, setAlbumArtSize } from "./dom";
 
 let wakeLock: WakeLockSentinel | null = null;
 
@@ -232,6 +232,7 @@ export function initializeLyrics(): void {
 
       AppState.queueLyricInjection = true;
       AppState.queueAlbumArtInjection = true;
+      AppState.queueAlbumArtSizeChange = false;
       AppState.queueSongDetailsInjection = true;
       AppState.hasPreloadedNextSong = false;
     }
@@ -272,6 +273,15 @@ export function initializeLyrics(): void {
     if (AppState.queueAlbumArtInjection && AppState.shouldInjectAlbumArt === true) {
       AppState.queueAlbumArtInjection = false;
       addAlbumArtToLayout(currentVideoId);
+    }
+
+    if (AppState.queueAlbumArtSizeChange) {
+      AppState.queueAlbumArtSizeChange = false;
+      setTimeout(() => {
+        const root = getComputedStyle(document.documentElement);
+        const albumArtQuality = root.getPropertyValue("--ytmusic-album-art-img-size") || "600";
+        setAlbumArtSize(albumArtQuality);
+      }, 3000)
     }
 
     if (AppState.lyricInjectionFailed) {

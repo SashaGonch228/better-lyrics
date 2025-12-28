@@ -704,6 +704,23 @@ export function injectSongAttributes(title: string, artist: string): void {
 }
 
 /**
+ * Sets the size of the album art image
+ */ 
+export function setAlbumArtSize(size: string): void {
+  const albumArt = document.querySelector(SONG_IMAGE_SELECTOR) as HTMLImageElement;
+  const img = new Image();
+  img.src = albumArt.src;
+
+  if (/w\d+-h\d+/.test(albumArt.src)) {
+    img.src = albumArt.src.replace(/w\d+-h\d+/, `w${size}-h${size}`);
+  }
+
+  img.onload = () => {
+    albumArt.src = img.src;
+  }
+}
+
+/**
  * Generates link to search on Genius
  *
  * @param song - Song name
