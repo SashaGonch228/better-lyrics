@@ -230,7 +230,6 @@ export function initializeLyrics(): void {
       AppState.queueLyricInjection = true;
       AppState.queueAlbumArtInjection = true;
       AppState.queueSongDetailsInjection = true;
-      AppState.suppressZeroTime = Date.now() + 5000;
       AppState.hasPreloadedNextSong = false;
     }
 
