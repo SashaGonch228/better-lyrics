@@ -17,7 +17,13 @@ import { hideAdOverlay, isAdPlaying, isLoaderActive, showAdOverlay } from "@modu
 import { log } from "@utils";
 import type { Lyric } from "@modules/lyrics/providers/shared";
 
-const MIRCO_SCROLL_THRESHOLD_S = 0.3;
+const MIRCO_SCROLL_THRESHOLD_S = 0.5 as const;
+const EARLY_SCROLL_CONSIDER = 0.6 as const;
+const QUEUE_SCROLL_THRESHOLD = 150 as const;
+
+
+const DEBUG_SCROLLING = true;
+
 
 interface AnimEngineState {
   skipScrolls: number;
@@ -31,6 +37,7 @@ interface AnimEngineState {
   lastPlayState: boolean;
   lastEventCreationTime: number;
   lastActiveElements: LineData[];
+  queuedScroll: boolean;
   /**
    * Track if this is the first new tick to avoid rescrolls when opening the lyrics
    */
@@ -50,6 +57,7 @@ export let animEngineState: AnimEngineState = {
   lastEventCreationTime: 0,
   doneFirstInstantScroll: true,
   lastActiveElements: [],
+  queuedScroll: false,
 };
 
 export let cachedDurations: Map<string, number> = new Map();
@@ -93,6 +101,7 @@ export function getCSSProperty(lyricsElement: HTMLElement, property: string): st
 
   return value;
 }
+
 
 /**
  * Main lyrics synchronization function that handles timing, highlighting, and scrolling.
@@ -176,9 +185,10 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
         nextTime = nextLyric.time;
       }
 
-      if (lyricScrollTime >= time && (lyricScrollTime < nextTime || lyricScrollTime < time + lineData.duration)) {
+      if (lyricScrollTime >= time - EARLY_SCROLL_CONSIDER && (lyricScrollTime < nextTime || lyricScrollTime < time + lineData.duration)) {
         activeElems.push(lineData);
-        if (!animEngineState.lastActiveElements.includes(lineData)) {
+        if (!animEngineState.lastActiveElements.includes(lineData) && lyricScrollTime >= time) {
+          console.log("new selected lyrics", lineData);
           newLyricSelected = true;
         }
 
@@ -299,7 +309,9 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
         activeElems.push(lyricData.lines[0]);
       }
 
-      animEngineState.lastActiveElements = activeElems;
+      animEngineState.lastActiveElements = activeElems.filter(
+          elm => lyricScrollTime >= elm.time // remove elements that haven't reached their scroll time yet.
+      );
 
       // Offset so lyrics appear towards the center of the screen.
       const scrollPosOffset = tabRendererHeight * topOffsetMultiplier;
@@ -321,15 +333,11 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
       let avgPos =
         lyricPositions.reduce((accumulator, currentValue) => accumulator + currentValue, 0) / lyricPositions.length;
 
-      if (lyricPositions.length > 1) {
-        console.log(lyricPositions, avgPos, lyricPositions.length);
-      }
-
       // Base position
       let scrollPos = avgPos - scrollPosOffset;
 
       // Make sure the first selected line is stays visible
-      scrollPos = Math.min(scrollPos, lyricPositions[0]);
+      scrollPos = Math.min(scrollPos, activeElems[0].position);
 
       // Make sure bottom of last active lyric is visible
       scrollPos = Math.max(scrollPos, lastActiveLyric.position - tabRendererHeight + lastActiveLyric.height);
@@ -349,31 +357,38 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
       }
 
       if (
-        Math.abs(scrollTop - scrollPos) > 2 &&
-        Date.now() > animEngineState.nextScrollAllowedTime &&
-        (animEngineState.wasUserScrolling || newLyricSelected)
-      ) {
-        if (smoothScroll) {
-          lyricsElement.style.transitionTimingFunction = "";
-          lyricsElement.style.transitionProperty = "";
-          lyricsElement.style.transitionDuration = "";
+        animEngineState.wasUserScrolling || newLyricSelected || animEngineState.queuedScroll) {
+        if (Date.now() > animEngineState.nextScrollAllowedTime) {
+        animEngineState.queuedScroll = false;
+          if (smoothScroll) {
+            lyricsElement.style.transitionTimingFunction = "";
+            lyricsElement.style.transitionProperty = "";
+            lyricsElement.style.transitionDuration = "";
 
-          let scrollTime = getCSSDurationInMs(lyricsElement, "transition-duration");
+            let scrollTime = getCSSDurationInMs(lyricsElement, "transition-duration");
 
-          lyricsElement.style.transition = "transform 0s ease-in-out 0s";
-          lyricsElement.style.transform = `translate(0px, ${-(scrollTop - scrollPos)}px)`;
-          reflow(lyricsElement);
-          lyricsElement.style.transition = "";
-          lyricsElement.style.transform = "translate(0px, 0px)";
+            lyricsElement.style.transition = "transform 0s ease-in-out 0s";
+            lyricsElement.style.transform = `translate(0px, ${-(scrollTop - scrollPos)}px)`;
+            reflow(lyricsElement);
+            lyricsElement.style.transition = "";
+            lyricsElement.style.transform = "translate(0px, 0px)";
 
-          animEngineState.nextScrollAllowedTime = scrollTime + Date.now() + 20;
+            animEngineState.nextScrollAllowedTime = scrollTime + Date.now() + 20;
+          }
+          let extraHeight = Math.max(tabRendererHeight * (1 - topOffsetMultiplier), tabRendererHeight - lyricsHeight);
+
+          (document.getElementById(LYRICS_SPACING_ELEMENT_ID) as HTMLElement).style.height =
+              `${extraHeight.toFixed(0)}px`;
+          scrollTop = scrollPos;
+          animEngineState.scrollPos = scrollPos;
+        } else if (animEngineState.nextScrollAllowedTime - Date.now() < QUEUE_SCROLL_THRESHOLD) {
+          // just missed out on being able to scroll, queue this once we finish our current lyric
+          console.log("queueing a scroll", animEngineState.nextScrollAllowedTime - Date.now())
+          animEngineState.queuedScroll = true;
+        } else {
+          console.log("not queueing a scroll", animEngineState.nextScrollAllowedTime - Date.now());
         }
-        let extraHeight = Math.max(tabRendererHeight * (1 - topOffsetMultiplier), tabRendererHeight - lyricsHeight);
 
-        (document.getElementById(LYRICS_SPACING_ELEMENT_ID) as HTMLElement).style.height =
-          `${extraHeight.toFixed(0)}px`;
-        scrollTop = scrollPos;
-        animEngineState.scrollPos = scrollPos;
       }
     }
 
