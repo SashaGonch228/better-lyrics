@@ -188,12 +188,13 @@ export function setupRequestSniffer(): void {
                 if (hasVideoWord) {
                   byLineIsVideo = true;
                 }
-                return trimmed.length > 0 && trimmed !== "•" && !hasVideoWord;
+                return trimmed.length > 0 && trimmed !== "•" && trimmed !== "&" && !hasVideoWord;
               })
               .map(r => r.text);
 
             let artist: string;
             let album = "";
+            console.log(longByLine, byLineIsVideo);
             if (byLineIsVideo) {
               artist = longByLine?.join(", ");
             } else {
@@ -242,7 +243,8 @@ export function setupRequestSniffer(): void {
           } else {
             return { primary: primary };
           }
-        });
+        }).filter(pair => pair); //remove null values
+
         for (let [index, videoPair] of videoPairs.entries()) {
           if (!videoPair) {
             continue;

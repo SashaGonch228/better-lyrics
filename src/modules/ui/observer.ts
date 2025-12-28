@@ -251,7 +251,7 @@ export function initializeLyrics(): void {
             await preFetchLyrics(
               {
                 song: next.title,
-                artist: next.title,
+                artist: next.artist,
                 duration: String(Math.round(next.durationMs / 1000)),
                 videoId: next.id,
               },
