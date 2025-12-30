@@ -709,6 +709,7 @@ export function injectSongAttributes(title: string, artist: string): void {
  */ 
 export function setAlbumArtSize(size: string): void {
   const albumArt = document.querySelector(SONG_IMAGE_SELECTOR) as HTMLImageElement;
+  const origSrc = albumArt.src;
   const img = new Image();
   img.src = albumArt.src;
 
@@ -717,7 +718,7 @@ export function setAlbumArtSize(size: string): void {
   }
 
   img.onload = () => {
-    albumArt.src = img.src;
+    if (origSrc == albumArt.src) albumArt.src = img.src;
   }
   
   log(ALBUM_ART_SIZE_CHANGED, size)
