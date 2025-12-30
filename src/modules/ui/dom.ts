@@ -131,9 +131,9 @@ export function createLyricsWrapper(): HTMLElement {
 
     if (lineElements.length === 0) {
       const text = fragment.textContent?.replace(/\s+/g, " ").trim();
-      if (text) {
+      if (text && e.clipboardData) {
         e.preventDefault();
-        e.clipboardData?.setData("text/plain", text);
+        e.clipboardData.setData("text/plain", text);
       }
       return;
     }
