@@ -248,7 +248,7 @@ export function initializeLyrics(): void {
         const root = getComputedStyle(document.documentElement);
         const albumArtQuality = root.getPropertyValue("--ytmusic-album-art-img-size") || "600";
         setAlbumArtSize(albumArtQuality);
-      }, 3000)
+      }, 2000)
     }
 
     if (AppState.lyricInjectionFailed) {
