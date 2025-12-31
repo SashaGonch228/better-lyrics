@@ -50,7 +50,6 @@ export function applyCustomStyles(css: string): void {
     reloadLyrics();
   }
   
-  
   let styleTag = document.getElementById("blyrics-custom-style");
   if (styleTag) {
     styleTag.textContent = css;
