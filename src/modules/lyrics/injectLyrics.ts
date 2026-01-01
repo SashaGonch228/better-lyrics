@@ -13,7 +13,7 @@ import {
   romanizationLanguages,
   ROMANIZED_LYRICS_CLASS,
   RTL_CLASS,
-  SYNC_DISABLED_LOG, TAB_RENDERER_SELECTOR,
+  SYNC_DISABLED_LOG,
   TRANSLATED_LYRICS_CLASS,
   TRANSLATION_ENABLED_LOG,
   WORD_CLASS,
@@ -41,7 +41,11 @@ import {
 } from "@modules/ui/animationEngine";
 import { addFooter, addNoLyricsButton, cleanup, createLyricsWrapper, flushLoader, renderLoader } from "@modules/ui/dom";
 import { getRelativeBounds, log } from "@utils";
-import {recreateDebugCanvas} from "@modules/ui/animationEngineDebug";
+import {resizeCanvas} from "@modules/ui/animationEngineDebug";
+import {registerThemeSetting} from "@modules/settings/themeOptions";
+
+let disableRichsync = registerThemeSetting("blyrics-disable-richsync", false, true);
+let lineSyncedAnimationDelay = registerThemeSetting("blyrics-line-synced-animation-delay", 50, true);
 
 function findNearestAgent(lyrics: Lyric[], fromIndex: number): string | undefined {
   for (let i = fromIndex - 1; i >= 0; i--) {
@@ -328,14 +332,14 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
 
     let item = lyricItem as Required<Pick<Lyric, "parts">> & Lyric;
 
-    if (item.parts.length === 0 || AppState.animationSettings.disableRichSynchronization) {
+    if (item.parts.length === 0 || disableRichsync.getBooleanValue()) {
       lyricItem.parts = [];
       const words = item.words.split(" ");
 
       words.forEach((word, index) => {
         word = word.trim().length < 1 ? word : word + " ";
         item.parts.push({
-          startTimeMs: item.startTimeMs + index * AppState.animationSettings.lineSyncedWordDelayMs,
+          startTimeMs: item.startTimeMs + index * lineSyncedAnimationDelay.getNumberValue(),
           words: word,
           durationMs: 0,
         });
@@ -443,7 +447,7 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
         if (
           item.timedRomanization &&
           item.timedRomanization.length > 0 &&
-          !AppState.animationSettings.disableRichSynchronization
+            !disableRichsync.getBooleanValue()
         ) {
           createLyricsLine(item.timedRomanization, line, createRomanizedElem());
         } else {
@@ -617,7 +621,7 @@ export function calculateLyricPositions() {
       line.height = bounds.height;
     });
     animEngineState.wasUserScrolling = true; // trigger rescrolls
-    recreateDebugCanvas();
+    resizeCanvas();
   }
 }
 
