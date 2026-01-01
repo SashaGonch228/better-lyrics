@@ -35,7 +35,7 @@ function createDebugCanvas() {
     console.error("Can't find canvas context");
     return;
   }
-  resizeCanvas()
+  resizeCanvas();
 }
 
 export function resetDebugRender(scrollPos: number) {

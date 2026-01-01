@@ -16,7 +16,7 @@ import { calculateLyricPositions, type LineData } from "@modules/lyrics/injectLy
 import { hideAdOverlay, isAdPlaying, isLoaderActive, showAdOverlay } from "@modules/ui/dom";
 import { log } from "@utils";
 import { ctx, resetDebugRender } from "./animationEngineDebug";
-import {registerThemeSetting} from "@modules/settings/themeOptions";
+import { registerThemeSetting } from "@modules/settings/themeOptions";
 
 const LYRIC_ENDING_THRESHOLD_S = registerThemeSetting("blyrics-lyric-ending-threshold-s", 0.5);
 const EARLY_SCROLL_CONSIDER = registerThemeSetting("blyrics-early-scroll-consider-s", 0.62);
@@ -206,7 +206,7 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
       }
 
       if (
-          lyricScrollTime >= time - EARLY_SCROLL_CONSIDER.getNumberValue() &&
+        lyricScrollTime >= time - EARLY_SCROLL_CONSIDER.getNumberValue() &&
         (lyricScrollTime < nextTime || lyricScrollTime < time + lineData.duration)
       ) {
         activeElems.push(lineData);
@@ -342,7 +342,7 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
         .filter((lineData, index) => {
           // Ignore lyrics close to finishing unless it last active lyric
           return (
-              lyricScrollTime < lineData.time + lineData.duration - LYRIC_ENDING_THRESHOLD_S.getNumberValue() ||
+            lyricScrollTime < lineData.time + lineData.duration - LYRIC_ENDING_THRESHOLD_S.getNumberValue() ||
             index == activeElems.length - 1
           );
         })
@@ -372,7 +372,7 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
         let transform = window.getComputedStyle(lyricsElement).transform;
         const matrix = new DOMMatrix(transform);
         let yTransform = matrix.f;
-        let yTop = scrollTop - yTransform
+        let yTop = scrollTop - yTransform;
         resetDebugRender(yTop);
         if (ctx) {
           ctx.strokeStyle = "green";
@@ -400,11 +400,11 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
           ctx.stroke();
 
           function debugLyrics(
-              xOffset: number,
-              name: string,
-              activeElems: LineData[],
-              lyricPositions: number[],
-              lyricScrollTime: number
+            xOffset: number,
+            name: string,
+            activeElems: LineData[],
+            lyricPositions: number[],
+            lyricScrollTime: number
           ) {
             ctx!.strokeStyle = "red";
             ctx!.fillStyle = "red";
@@ -431,9 +431,9 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
               ctx?.lineTo(xOffset + 5, elm.position + elm.height);
               ctx?.stroke();
               ctx?.fillText(
-                  "time: start=" + elm.time.toFixed(2) + " end=" + endTime.toFixed(2),
-                  xOffset + 15,
-                  elm.position
+                "time: start=" + elm.time.toFixed(2) + " end=" + endTime.toFixed(2),
+                xOffset + 15,
+                elm.position
               );
               ctx?.fillText("till active: " + timeTillActive.toFixed(2), xOffset + 15, elm.position + 15);
               ctx?.fillText("till end: " + timeTillEnd.toFixed(2), xOffset + 15, elm.position + 30);
@@ -450,11 +450,11 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
 
           debugLyrics(0, "realtime", activeElems, lyricPositions, lyricScrollTime);
           debugLyrics(
-              160,
-              "last scroll",
-              animEngineState.lastScrollDebugContext.activeElms,
-              animEngineState.lastScrollDebugContext.centers,
-              animEngineState.lastScrollDebugContext.lyricScrollTime
+            160,
+            "last scroll",
+            animEngineState.lastScrollDebugContext.activeElms,
+            animEngineState.lastScrollDebugContext.centers,
+            animEngineState.lastScrollDebugContext.lyricScrollTime
           );
         }
       }
@@ -489,13 +489,19 @@ export function animationEngine(currentTime: number, eventCreationTime: number, 
 
             animEngineState.nextScrollAllowedTime = scrollTime + Date.now() + 20;
           }
-          let extraHeight = Math.max(tabRendererHeight * (1 - SCROLL_POS_OFFSET_RATIO.getNumberValue()), tabRendererHeight - lyricsHeight);
+          let extraHeight = Math.max(
+            tabRendererHeight * (1 - SCROLL_POS_OFFSET_RATIO.getNumberValue()),
+            tabRendererHeight - lyricsHeight
+          );
 
           (document.getElementById(LYRICS_SPACING_ELEMENT_ID) as HTMLElement).style.height =
             `${extraHeight.toFixed(0)}px`;
           scrollTop = scrollPos;
           animEngineState.scrollPos = scrollPos;
-        } else if (animEngineState.nextScrollAllowedTime - Date.now() < QUEUE_SCROLL_THRESHOLD.getNumberValue() || timeJumped) {
+        } else if (
+          animEngineState.nextScrollAllowedTime - Date.now() < QUEUE_SCROLL_THRESHOLD.getNumberValue() ||
+          timeJumped
+        ) {
           // just missed out on being able to scroll, queue this once we finish our current lyric
           animEngineState.queuedScroll = true;
         }

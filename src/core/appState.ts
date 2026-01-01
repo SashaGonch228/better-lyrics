@@ -1,4 +1,4 @@
-import {GENERAL_ERROR_LOG} from "@constants";
+import { GENERAL_ERROR_LOG } from "@constants";
 import type { LyricsData } from "@modules/lyrics/injectLyrics";
 import { createLyrics } from "@modules/lyrics/lyrics";
 import { log } from "@utils";
