@@ -36,7 +36,7 @@
 			var(--blyrics-inactive-opacity, 0.3)
 	);
 
-	--blyrics-richsync-timing-offset: 0.02s;
+	--blyrics-richsync-timing-offset: 0.150s;
 	--blyrics-timing-offset: 0.115s;
 
 	--blyrics-scroll-timing-offset: 0.5s;
