@@ -358,3 +358,11 @@ ytmusic-player-page[player-fullscreened]:not([blyrics-dfs]) #blyrics-wrapper:has
   transition: opacity 0.3s ease;
   transition-delay: var(--blyrics-no-lyrics-slide-delay);
 }
+
+
+/* Trick yt player into serving higher res videos */
+#movie_player {
+  width: 200%;
+  height: 200%;
+  transform: scale(50%) translateX(-50%) translateY(-50%);
+}
