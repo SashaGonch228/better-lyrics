@@ -59,9 +59,14 @@ export function setThemeSettings(map: Map<string, string>) {
     if (setting) {
       let lastValue = setting.value;
       if (setting.type === "number") {
-        setting.value = parseFloat(value);
+        const parsed = parseFloat(value);
+        if (isNaN(parsed)) {
+          setting.value = setting.defaultValue;
+        } else {
+          setting.value = parsed;
+        }
       } else if (setting.type === "boolean") {
-        setting.value = value === "true";
+        setting.value = value.toLowerCase() === "true";
       } else {
         setting.value = value;
       }
