@@ -1,5 +1,3 @@
-import { LYRICS_CLASS } from "@constants";
-
 const CANVAS_ID = "blyrics-lyric-debug-canvas";
 
 export let ctx: CanvasRenderingContext2D | null = null;
