@@ -664,6 +664,33 @@ export function addNoLyricsButton(song: string, artist: string, album: string, d
     href: lrclibUrl.toString(),
   });
 
+  const openLyricsContainer = createActionButton({
+    text: "Open .lrc",
+    href: "#",
+    onClick: (e: MouseEvent) => {
+      e.preventDefault();
+
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = ".lrc, .txt";
+      fileInput.style.display = "none";
+
+      fileInput.onchange = async (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          await injectLocalLrc(text);
+        } catch (err) {
+          log("Failed to inject .lrc:", err);
+        }
+      };
+
+      fileInput.click();
+      }
+    });
+
   const geniusSearch = createActionButton({
     text: "Search on Genius",
     href: getGeniusLink(song, artist),
@@ -672,6 +699,7 @@ export function addNoLyricsButton(song: string, artist: string, album: string, d
   });
 
   buttonContainer.appendChild(addLyricsButton);
+  buttonContainer.appendChild(openLyricsContainer);
   buttonContainer.appendChild(geniusSearch);
   lyricsWrapper.appendChild(buttonContainer);
 }
