@@ -282,56 +282,10 @@ export function createFooter(song: string, artist: string, album: string, durati
 
     discordLink.appendChild(discordImage);
 
-    const lrclibUrl = new URL(LRCLIB_UPLOAD_URL);
-    if (song) lrclibUrl.searchParams.append("title", song);
-    if (artist) lrclibUrl.searchParams.append("artist", artist);
-    if (album) lrclibUrl.searchParams.append("album", album);
-    if (duration) lrclibUrl.searchParams.append("duration", duration.toString());
-    footerLink.target = "_blank";
-
-    const addLyricsContainer = createActionButton({
-      text: "Add Lyrics to LRCLib",
-      href: lrclibUrl.toString(),
-    });
-
-    const geniusContainer = createActionButton({
-      text: "Search on Genius",
-      href: getGeniusLink(song, artist),
-      logoSrc: GENIUS_LOGO_SRC,
-      logoAlt: "Genius",
-    });
-
-    const openLyricsContainer = createActionButton({
-        text: "Open .lrc",
-        href: "#",
-        onClick: (e: MouseEvent) => {
-            e.preventDefault();
-
-            const fileInput = document.createElement("input");
-            fileInput.type = "file";
-            fileInput.accept = ".lrc, .txt";
-            fileInput.style.display = "none";
-
-            fileInput.onchange = async (event) => {
-                const file = (event.target as HTMLInputElement).files?.[0];
-                if (!file) return;
-
-                try {
-                    const text = await file.text();
-                    await injectLocalLrc(text);
-                } catch (err) {
-                    log("Failed to inject .lrc:", err);
-                }
-            };
-
-            fileInput.click();
-        }
-    });
-
     footer.appendChild(footerContainer);
-    footer.appendChild(geniusContainer);
-    footer.appendChild(addLyricsContainer);
-    footer.appendChild(openLyricsContainer);
+    footer.appendChild(getGeniusButton(song, artist));
+    footer.appendChild(getAddLyricsButton(song, artist, album, duration));
+    footer.appendChild(getOpenLyricsContainer());
     footer.appendChild(discordLink);
 
     footer.removeAttribute("is-empty");
@@ -653,54 +607,9 @@ export function addNoLyricsButton(song: string, artist: string, album: string, d
   const buttonContainer = document.createElement("div");
   buttonContainer.className = "blyrics-no-lyrics-button-container";
 
-  const lrclibUrl = new URL(LRCLIB_UPLOAD_URL);
-  if (song) lrclibUrl.searchParams.append("title", song);
-  if (artist) lrclibUrl.searchParams.append("artist", artist);
-  if (album) lrclibUrl.searchParams.append("album", album);
-  if (duration) lrclibUrl.searchParams.append("duration", duration.toString());
-
-  const addLyricsButton = createActionButton({
-    text: "Add Lyrics to LRCLib",
-    href: lrclibUrl.toString(),
-  });
-
-  const openLyricsContainer = createActionButton({
-    text: "Open .lrc",
-    href: "#",
-    onClick: (e: MouseEvent) => {
-      e.preventDefault();
-
-      const fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.accept = ".lrc, .txt";
-      fileInput.style.display = "none";
-
-      fileInput.onchange = async (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0];
-        if (!file) return;
-
-        try {
-          const text = await file.text();
-          await injectLocalLrc(text);
-        } catch (err) {
-          log("Failed to inject .lrc:", err);
-        }
-      };
-
-      fileInput.click();
-      }
-    });
-
-  const geniusSearch = createActionButton({
-    text: "Search on Genius",
-    href: getGeniusLink(song, artist),
-    logoSrc: GENIUS_LOGO_SRC,
-    logoAlt: "Genius",
-  });
-
-  buttonContainer.appendChild(addLyricsButton);
-  buttonContainer.appendChild(openLyricsContainer);
-  buttonContainer.appendChild(geniusSearch);
+  buttonContainer.appendChild(getAddLyricsButton(song, artist, album, duration));
+  buttonContainer.appendChild(getOpenLyricsContainer());
+  buttonContainer.appendChild(getGeniusButton(song, artist));
   lyricsWrapper.appendChild(buttonContainer);
 }
 
@@ -851,4 +760,55 @@ function setAlbumArtSize(size: string | number): void {
 function getGeniusLink(song: string, artist: string): string {
   const searchQuery = encodeURIComponent(`${artist.trim()} - ${song.trim()}`);
   return `https://genius.com/search?q=${searchQuery}`;
+}
+
+function getGeniusButton(song: string, artist: string): HTMLElement {
+    return createActionButton({
+        text: "Search on Genius",
+        href: getGeniusLink(song, artist),
+        logoSrc: GENIUS_LOGO_SRC,
+        logoAlt: "Genius",
+    });
+}
+
+function getOpenLyricsContainer(): HTMLElement {
+    return createActionButton({
+        text: "Open .lrc",
+        href: "#",
+        onClick: (e: MouseEvent) => {
+            e.preventDefault();
+
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = ".lrc, .txt";
+            fileInput.style.display = "none";
+
+            fileInput.onchange = async (event) => {
+                const file = (event.target as HTMLInputElement).files?.[0];
+                if (!file) return;
+
+                try {
+                    const text = await file.text();
+                    await injectLocalLrc(text);
+                } catch (err) {
+                    log("Failed to inject .lrc:", err);
+                }
+            };
+
+            fileInput.click();
+        }
+    });
+}
+
+function getAddLyricsButton(song: string, artist: string, album: string, duration: Number): HTMLElement {
+    const lrclibUrl = new URL(LRCLIB_UPLOAD_URL);
+    if (song) lrclibUrl.searchParams.append("title", song);
+    if (artist) lrclibUrl.searchParams.append("artist", artist);
+    if (album) lrclibUrl.searchParams.append("album", album);
+    if (duration) lrclibUrl.searchParams.append("duration", duration.toString());
+
+    return createActionButton({
+        text: "Add Lyrics to LRCLib",
+        href: lrclibUrl.toString(),
+    });
 }
