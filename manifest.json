@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "version": "2.2.0.2",
+  "version": "2.3.0.1",
+  "default_locale": "en",
   "name": "Better Lyrics (Lyrics for Youtube Music)",
-  "description": "Enhance YouTube Music with beautiful time-synced lyrics, multilingual support, real-time translations and more",
-  "homepage_url": "https://better-lyrics.boidu.dev",
+  "description": "__MSG_extensionDescription__",
+  "homepage_url": "https://betterlyrics.org",
   "icons": {
     "16": "images/icons/icon-16.png",
     "48": "images/icons/icon-48.png",
@@ -17,15 +18,16 @@
     "storage",
     "alarms"
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://unison.boidu.dev/*",
+      "https://blrcunison.vercel.app/*"
+    ]
+  },
   "optional_permissions": [
     "downloads"
   ],
-  "optional_host_permissions": [
-    "https://raw.githubusercontent.com/better-lyrics/themes/*",
-    "https://better-lyrics-themes-api.boidu.dev/*",
-    "https://raw.githubusercontent.com/*",
-    "https://api.github.com/*"
-  ],
+  "optional_host_permissions": [],
   "options_ui": {
     "page": "src/options/options.html",
     "open_in_tab": false
@@ -36,15 +38,23 @@
         "*://music.youtube.com/*"
       ],
       "resources": [
-        "css/blyrics.css",
-        "css/ytmusic.css",
+        "css/blyrics/*.css",
+        "css/ytmusic/*.css",
         "css/disablestylizedanimations.css",
         "css/themesong.css",
         "css/themes/*.css",
         "*.js.map",
         "pages/standalone-editor.html",
-        "pages/marketplace.html"
+        "pages/marketplace.html",
+        "pages/unison.html"
       ]
+    },
+    {
+      "matches": [
+        "https://unison.boidu.dev/*",
+        "https://blrcunison.vercel.app/*"
+      ],
+      "resources": ["pages/auth.html"]
     }
   ],
   "chromium:background": {
@@ -99,5 +109,5 @@
   "action": {
     "default_popup": "src/options/options.html"
   },
-  "version_name": "2.2.0-canary 2"
+  "version_name": "2.3.0-canary 1"
 }

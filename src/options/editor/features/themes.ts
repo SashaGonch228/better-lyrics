@@ -1,13 +1,17 @@
 import { LOG_PREFIX_EDITOR } from "@constants";
+import { t } from "@core/i18n";
 import { getSyncStorage } from "@core/storage";
-
+import {
+  getInstalledStoreThemes,
+  getInstalledTheme,
+  installSymlinkedThemeFromMarketplace,
+} from "../../store/themeStoreManager";
 import type { ThemeSource } from "../../store/types";
-import type { ThemeCardOptions } from "../types";
-
-import { getInstalledTheme } from "../../store/themeStoreManager";
+import type { Theme } from "../../themes";
 import THEMES, { deleteCustomTheme, getCustomThemes, renameCustomTheme, saveCustomTheme } from "../../themes";
 import { SAVE_CUSTOM_THEME_DEBOUNCE, SAVE_DEBOUNCE_DELAY } from "../core/editor";
 import { editorStateManager } from "../core/state";
+import type { ThemeCardOptions } from "../types";
 import {
   deleteThemeBtn,
   editThemeBtn,
@@ -16,15 +20,45 @@ import {
   themeModalOverlay,
   themeNameDisplay,
   themeNameText,
-  themeSourceBadge,
+  themePreviewAuthor,
+  themePreviewBadge,
+  themePreviewCard,
+  themePreviewName,
   themeSelectorBtn,
+  themeSourceBadge,
 } from "../ui/dom";
 import { showAlert, showConfirm, showPrompt } from "../ui/feedback";
-import { broadcastRICSToTabs, saveToStorageWithFallback, showSyncError, showSyncSuccess } from "./storage";
+import {
+  applyStoreThemeComplete,
+  broadcastRICSToTabs,
+  saveToStorageWithFallback,
+  showSyncError,
+  showSyncSuccess,
+} from "./storage";
 
 const STORE_THEME_PREFIX = "store:";
+const preloadedImages = new Set<string>();
 
-export type EditorThemeSource = "marketplace" | "github" | "custom" | "builtin" | null;
+function preloadImage(url: string): Promise<void> {
+  if (!url || preloadedImages.has(url)) return Promise.resolve();
+  preloadedImages.add(url);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
+
+export async function preloadInstalledThemeImages(): Promise<void> {
+  const themes = await getInstalledStoreThemes();
+  for (const theme of themes) {
+    const url = theme.imageUrls?.[0] ?? theme.coverUrl;
+    if (url) preloadImage(url);
+  }
+}
+
+type EditorThemeSource = "marketplace" | "github" | "custom" | "builtin" | null;
 
 function createMarketplaceIcon(): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -44,6 +78,19 @@ function createMarketplaceIcon(): SVGSVGElement {
   );
   pathFill.setAttribute("clip-rule", "evenodd");
   svg.appendChild(pathFill);
+  return svg;
+}
+
+function createBundledIcon(): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "currentColor");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    "M11.15 12.335v9.18a.6.6 0 0 1-.15-.08l-6.51-3.91a1.9 1.9 0 0 1-.7-.7a1.9 1.9 0 0 1-.25-1v-8.07zm9.31-4.58v8.1a2.1 2.1 0 0 1-.27.95a1.74 1.74 0 0 1-.69.71l-6.51 3.91l-.14.07v-9.17l3.26-2v2.77a.85.85 0 1 0 1.7 0v-3.74zm-5.18 1.15l-3.28 2l-7.66-4.6l.11-.07l3.06-1.63zm4.37-2.62l-2.71 1.62l-7.64-4.28l1.66-.87a2 2 0 0 1 1-.27a2.1 2.1 0 0 1 1 .28l6.47 3.46a.5.5 0 0 1 .22.06"
+  );
+  svg.appendChild(path);
   return svg;
 }
 
@@ -83,7 +130,7 @@ export function themeSourceToEditorSource(source: ThemeSource | undefined): Edit
   return null;
 }
 
-export class ThemeManager {
+class ThemeManager {
   async applyTheme(isCustom: boolean, index: number, themeName: string): Promise<void> {
     console.log(LOG_PREFIX_EDITOR, `Applying ${isCustom ? "custom" : "built-in"} theme: ${themeName}`);
 
@@ -135,6 +182,44 @@ export class ThemeManager {
       throw new Error(`Built-in theme at index ${index} not found`);
     }
 
+    if (selectedTheme.storeId) {
+      return this.applySymlinkedTheme(selectedTheme as Theme & { storeId: string });
+    }
+
+    await this.applyBundledFallback(selectedTheme);
+  }
+
+  private async applySymlinkedTheme(theme: Theme & { storeId: string }): Promise<void> {
+    console.log(LOG_PREFIX_EDITOR, `Applying symlinked theme: ${theme.name} → ${theme.storeId}`);
+
+    let installed = await installSymlinkedThemeFromMarketplace(theme.storeId);
+
+    if (!installed) {
+      installed = await getInstalledTheme(theme.storeId);
+    }
+
+    if (installed) {
+      const success = await applyStoreThemeComplete({
+        themeId: installed.id,
+        css: installed.css,
+        title: installed.title || theme.name,
+        creators: installed.creators || [],
+        source: "marketplace",
+      });
+
+      if (success) {
+        showAlert(t("symlink_applied", theme.name));
+        return;
+      }
+    }
+
+    console.warn(LOG_PREFIX_EDITOR, `Marketplace install failed for ${theme.storeId}`);
+    showAlert(t("symlink_installFailed"));
+  }
+
+  private async applyBundledFallback(selectedTheme: Theme): Promise<void> {
+    console.log(LOG_PREFIX_EDITOR, `Using bundled fallback for: ${selectedTheme.name}`);
+
     const response = await fetch(chrome.runtime.getURL(`css/themes/${selectedTheme.path}`));
     const css = await response.text();
 
@@ -154,7 +239,7 @@ export class ThemeManager {
 
       await this.saveTheme(themeContent);
 
-      showAlert(`Applied theme: ${selectedTheme.name}`);
+      showAlert(t("builtin_applied", selectedTheme.name));
     });
   }
 
@@ -178,9 +263,9 @@ export class ThemeManager {
   }
 }
 
-export const themeManager = new ThemeManager();
+const themeManager = new ThemeManager();
 
-export async function applyStoreThemeToEditor(
+async function applyStoreThemeToEditor(
   themeId: string,
   css: string,
   title: string,
@@ -382,15 +467,43 @@ export function saveToStorage(isTheme = false) {
     });
 }
 
+async function updateCreateEditButton(): Promise<void> {
+  const textSpan = document.getElementById("edit-css-btn-text");
+  if (!textSpan) return;
+
+  const themeName = editorStateManager.getCurrentThemeName();
+  const isDefaultTheme = themeName === "Default";
+
+  const { customCSS } = (await chrome.storage.sync.get("customCSS")) as { customCSS?: string };
+  const hasContent = customCSS && customCSS.trim().length > 0;
+
+  const showEdit = !isDefaultTheme && hasContent;
+  textSpan.textContent = showEdit ? "Edit" : "Create";
+}
+
 export async function updateThemeSelectorButton(): Promise<void> {
   if (!themeSelectorBtn) return;
 
+  updateCreateEditButton();
+
   const themeName = editorStateManager.getCurrentThemeName();
-  themeSelectorBtn.replaceChildren();
+
+  // -- Gather preview data before touching DOM --------------------------
+  let displayName = themeName || t("options_themes_chooseTheme");
+  let authorText = "";
+  let badgeLabel = "";
+  let badgeIcon: SVGSVGElement | null = null;
+  let bgUrl = "";
+
+  if (!themeName) {
+    const { customCSS } = (await chrome.storage.sync.get("customCSS")) as { customCSS?: string };
+    if (customCSS && customCSS.trim().length > 0) {
+      displayName = t("options_themes_customTheme");
+      authorText = t("theme_author_you");
+    }
+  }
 
   if (themeName) {
-    themeSelectorBtn.appendChild(document.createTextNode(themeName));
-
     const syncData = await getSyncStorage<{ themeName?: string }>(["themeName"]);
     const storedThemeName = syncData.themeName;
 
@@ -398,45 +511,104 @@ export async function updateThemeSelectorButton(): Promise<void> {
       const storeThemeId = storedThemeName.slice(STORE_THEME_PREFIX.length);
       const installedTheme = await getInstalledTheme(storeThemeId);
       if (installedTheme) {
-        const icon = installedTheme.source === "url" ? createGitHubIcon() : createMarketplaceIcon();
-        icon.classList.add("theme-selector-badge-icon");
-        const iconContainer = document.createElement("span");
-        iconContainer.className = "theme-selector-badge";
-        iconContainer.appendChild(icon);
-        iconContainer.append(installedTheme.source === "url" ? "GitHub" : "Marketplace");
-        themeSelectorBtn.dataset.source = installedTheme.source;
-        themeSelectorBtn.prepend(iconContainer);
+        const author = installedTheme.creators?.join(", ");
+        if (author) authorText = t("theme_author_prefix", author);
+        badgeIcon = installedTheme.source === "url" ? createGitHubIcon() : createMarketplaceIcon();
+        badgeLabel = installedTheme.source === "url" ? "GitHub" : "Marketplace";
+        bgUrl = installedTheme.imageUrls?.[0] ?? installedTheme.coverUrl ?? "";
       }
+    } else {
+      const builtIn = THEMES.find(theme => theme.name === storedThemeName);
+      authorText = builtIn ? t("theme_author_prefix", builtIn.author) : t("theme_author_you");
     }
-  } else {
-    themeSelectorBtn.appendChild(document.createTextNode("Choose a theme"));
+  }
+
+  if (bgUrl) await preloadImage(bgUrl);
+
+  // -- Apply all at once (no async gap) --------------------------
+  if (themePreviewName) themePreviewName.textContent = displayName;
+  if (themePreviewAuthor) themePreviewAuthor.textContent = authorText;
+  if (themePreviewCard)
+    themePreviewCard.style.setProperty("--theme-img-url", bgUrl ? `url("${bgUrl}")` : "transparent");
+
+  if (themePreviewBadge) {
+    themePreviewBadge.replaceChildren();
+    if (badgeIcon) {
+      themePreviewBadge.appendChild(badgeIcon);
+      themePreviewBadge.append(badgeLabel);
+      themePreviewBadge.classList.add("active");
+    } else {
+      themePreviewBadge.classList.remove("active");
+    }
   }
 }
 
-export async function populateThemeModal(): Promise<void> {
+async function populateThemeModal(): Promise<void> {
   if (!themeModalGrid) return;
 
   themeModalGrid.replaceChildren();
 
+  // -- Deprecation Banner --------------------------
+  const banner = document.createElement("div");
+  banner.className = "theme-deprecation-banner";
+
+  const content = document.createElement("div");
+  content.className = "theme-deprecation-content";
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "theme-deprecation-title";
+
+  const iconSpan = document.createElement("span");
+  iconSpan.className = "theme-deprecation-icon";
+  iconSpan.textContent = "\u26A0";
+  titleRow.appendChild(iconSpan);
+  titleRow.appendChild(document.createTextNode(t("deprecation_builtin_title")));
+  content.appendChild(titleRow);
+
+  const body = document.createElement("span");
+  body.className = "theme-deprecation-body";
+  body.textContent = t("deprecation_builtin_body");
+  content.appendChild(body);
+
+  banner.appendChild(content);
+
+  const cta = document.createElement("button");
+  cta.className = "theme-deprecation-cta";
+  cta.appendChild(createMarketplaceIcon());
+  cta.appendChild(document.createTextNode(t("deprecation_builtin_cta")));
+  cta.addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("pages/marketplace.html") });
+  });
+  banner.appendChild(cta);
+
+  themeModalGrid.appendChild(banner);
+
+  // -- Theme Grid --------------------------
   const customThemes = await getCustomThemes();
+  const syncData = await getSyncStorage<{ themeName?: string }>(["themeName"]);
+  const storedThemeName = syncData.themeName;
 
   const builtInSection = document.createElement("div");
   builtInSection.className = "theme-modal-section";
   const builtInTitle = document.createElement("h3");
   builtInTitle.className = "theme-modal-section-title";
-  builtInTitle.textContent = "Built-in Themes";
+  builtInTitle.textContent = t("theme_modal_section_builtin");
   builtInSection.appendChild(builtInTitle);
 
   const builtInGrid = document.createElement("div");
   builtInGrid.className = "theme-modal-items";
 
   THEMES.forEach((theme, index) => {
-    const card = createThemeCard({
-      name: theme.name,
-      author: theme.author,
-      isCustom: false,
-      index,
-    });
+    const card = createThemeCard(
+      {
+        name: theme.name,
+        author: theme.author,
+        isCustom: false,
+        index,
+        storeId: theme.storeId,
+      },
+      storedThemeName
+    );
     builtInGrid.appendChild(card);
   });
 
@@ -448,7 +620,7 @@ export async function populateThemeModal(): Promise<void> {
     customSection.className = "theme-modal-section";
     const customTitle = document.createElement("h3");
     customTitle.className = "theme-modal-section-title";
-    customTitle.textContent = "Custom Themes";
+    customTitle.textContent = t("theme_modal_section_custom");
     customSection.appendChild(customTitle);
 
     const customGrid = document.createElement("div");
@@ -469,12 +641,16 @@ export async function populateThemeModal(): Promise<void> {
   }
 }
 
-function createThemeCard(options: ThemeCardOptions): HTMLElement {
+function createThemeCard(options: ThemeCardOptions, storedThemeName?: string): HTMLElement {
   const card = document.createElement("div");
   card.className = "theme-card";
 
   const isStoreThemeActive = editorStateManager.getIsStoreTheme();
-  if (!isStoreThemeActive && editorStateManager.getCurrentThemeName() === options.name) {
+  const isSymlinkedActive = options.storeId && storedThemeName === `${STORE_THEME_PREFIX}${options.storeId}`;
+
+  if (isSymlinkedActive) {
+    card.classList.add("selected");
+  } else if (!isStoreThemeActive && editorStateManager.getCurrentThemeName() === options.name) {
     card.classList.add("selected");
   }
 
@@ -493,7 +669,28 @@ function createThemeCard(options: ThemeCardOptions): HTMLElement {
 
   info.appendChild(name);
   info.appendChild(author);
+
+  if (options.storeId) {
+    const badge = document.createElement("div");
+    badge.className = "theme-card-badge";
+    const icon = createMarketplaceIcon();
+    icon.classList.add("theme-card-badge-icon");
+    badge.appendChild(icon);
+    badge.appendChild(document.createTextNode(t("symlink_badge_marketplace")));
+    info.appendChild(badge);
+  } else if (!options.isCustom) {
+    const badge = document.createElement("div");
+    badge.className = "theme-card-badge";
+    const icon = createBundledIcon();
+    icon.classList.add("theme-card-badge-icon", "theme-card-badge-icon--bundled");
+    badge.appendChild(icon);
+    badge.appendChild(document.createTextNode(t("symlink_badge_bundled")));
+    info.appendChild(badge);
+  }
+
   card.appendChild(info);
+
+  card.setAttribute("data-type", options.storeId ? "store" : options.isCustom ? "custom" : "builtin");
 
   card.addEventListener("click", () => {
     selectTheme(options.isCustom, options.index, options.name);
@@ -660,11 +857,13 @@ export async function handleDeleteTheme() {
 
   if (!themeName || !isCustom) return;
 
-  const confirmed = await showConfirm(
-    "Delete Theme",
-    `Are you sure you want to delete the theme <code>${themeName}</code>?`,
-    true
-  );
+  const message = document.createDocumentFragment();
+  message.append("Are you sure you want to delete the theme ");
+  const code = document.createElement("code");
+  code.textContent = themeName;
+  message.append(code, "?");
+
+  const confirmed = await showConfirm("Delete Theme", message, true);
   if (!confirmed) return;
 
   try {

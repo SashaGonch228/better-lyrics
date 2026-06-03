@@ -1,15 +1,12 @@
 import { LYRIC_SOURCE_KEYS, PROVIDER_CONFIGS, PROVIDER_SWITCHED_LOG } from "@constants";
+import { getTransientStorage, setTransientStorage } from "@core/storage";
 import { log } from "@utils";
-import bLyrics from "./blyrics/blyrics";
-import cubey, { type CubeyLyricSourceResult } from "./cubey";
-import lyricLib from "./lrclib";
+import unified from "./unified";
 import ytLyrics, { type YTLyricSourceResult } from "./yt";
 import { ytCaptions } from "./ytCaptions";
-import legato from "./legato";
-import { getTransientStorage, setTransientStorage } from "@core/storage";
-
+import unison, { type UnisonLyricSourceResult } from "@modules/lyrics/providers/unison";
 /** Current version of the lyrics cache format */
-const LYRIC_CACHE_VERSION = "2.0.0";
+const LYRIC_CACHE_VERSION = "2.1.0";
 
 interface AudioTrackData {
   id: string;
@@ -45,7 +42,7 @@ interface AudioTrackData {
 interface LyricSource {
   filled: boolean;
   resultCached: boolean;
-  lyricSourceResult: LyricSourceResult | CubeyLyricSourceResult | YTLyricSourceResult | null;
+  lyricSourceResult: LyricSourceResult | UnisonLyricSourceResult | YTLyricSourceResult | null;
   lyricSourceFiller: (providerParameters: ProviderParameters) => Promise<void>;
 }
 
@@ -56,6 +53,11 @@ export interface LyricSourceResult {
   sourceHref: string;
   musicVideoSynced?: boolean | null;
   cacheAllowed?: boolean;
+  album?: string;
+  artist?: string;
+  song?: string;
+  duration?: number;
+  unisonId?: number;
 }
 
 export type LyricsArray = Lyric[];
@@ -67,7 +69,8 @@ export interface Lyric {
   key?: string;
   parts?: LyricPart[];
   agent?: string;
-  translation?: { text: string; lang: string };
+  translations?: { [lang: string]: string };
+  translation?: { text: string; lang: string }; // old property
   romanization?: string;
   timedRomanization?: LyricPart[];
   isInstrumental?: boolean;
@@ -78,6 +81,7 @@ export interface LyricPart {
   words: string;
   durationMs: number;
   isBackground?: boolean;
+  explicit?: boolean;
 }
 
 export interface ProviderParameters {
@@ -144,15 +148,22 @@ export function initProviders(): void {
 }
 
 const sourceKeyToFillFn = {
-  "bLyrics-richsynced": bLyrics,
-  "bLyrics-synced": bLyrics,
-  "musixmatch-richsync": cubey,
-  "musixmatch-synced": cubey,
-  "lrclib-synced": lyricLib,
-  "lrclib-plain": lyricLib,
+  "binimum-richsynced": (p: ProviderParameters) => unified(p, "binimum-richsynced"),
+  "binimum-synced": (p: ProviderParameters) => unified(p, "binimum-synced"),
+  "bLyrics-richsynced": (p: ProviderParameters) => unified(p, "bLyrics-richsynced"),
+  "bLyrics-synced": (p: ProviderParameters) => unified(p, "bLyrics-synced"),
+  "unison-richsynced": unison,
+  "unison-synced": unison,
+  "unison-plain": unison,
+  "musixmatch-richsync": (p: ProviderParameters) => unified(p, "musixmatch-richsync"),
+  "musixmatch-synced": (p: ProviderParameters) => unified(p, "musixmatch-synced"),
+  "lrclib-synced": (p: ProviderParameters) => unified(p, "lrclib-synced"),
+  "lrclib-plain": (p: ProviderParameters) => unified(p, "lrclib-plain"),
   "yt-captions": ytCaptions,
   "yt-lyrics": ytLyrics,
-  "legato-synced": legato,
+  "legato-synced": (p: ProviderParameters) => unified(p, "legato-synced"),
+  "portato-richsynced": (p: ProviderParameters) => unified(p, "portato-richsynced"),
+  metadata: (p: ProviderParameters) => unified(p, "metadata" as LyricSourceKey),
 } as const;
 
 export type LyricSourceKey = Readonly<keyof typeof sourceKeyToFillFn>;
@@ -170,6 +181,25 @@ export function newSourceMap(): SourceMapType {
     resultCached: false,
     lyricSourceFiller: filler,
   }));
+}
+
+export async function saveLyricsToCache(providerParameters: ProviderParameters, provider: LyricSourceKey) {
+  let source = providerParameters.sourceMap[provider];
+  if (
+    source.filled &&
+    !source.resultCached &&
+    source.lyricSourceResult &&
+    source.lyricSourceResult.cacheAllowed !== false
+  ) {
+    source.resultCached = true;
+    const cacheKey = `blyrics_${providerParameters.videoId}_${provider}`;
+    let versionedData = {
+      version: LYRIC_CACHE_VERSION,
+      ...source.lyricSourceResult,
+    };
+    const cacheTime = 7 * 24 * 60 * 60 * 1000;
+    await setTransientStorage(cacheKey, JSON.stringify(versionedData), cacheTime);
+  }
 }
 
 /**
@@ -199,25 +229,11 @@ export async function getLyrics(
   }
 
   // Save result to cache for each provider
-  defaultPreferredProviderList.forEach(provider => {
-    let source = providerParameters.sourceMap[provider];
-    if (
-      source.filled &&
-      !source.resultCached &&
-      source.lyricSourceResult &&
-      source.lyricSourceResult.cacheAllowed !== false
-    ) {
-      source.resultCached = true;
-
-      const cacheKey = `blyrics_${providerParameters.videoId}_${provider}`;
-      let versionedData = {
-        version: LYRIC_CACHE_VERSION,
-        ...source.lyricSourceResult,
-      };
-      const cacheTime = 7 * 24 * 60 * 60 * 1000;
-      setTransientStorage(cacheKey, JSON.stringify(versionedData), cacheTime);
-    }
-  });
+  await Promise.allSettled(
+    defaultPreferredProviderList.map(async provider => {
+      await saveLyricsToCache(providerParameters, provider);
+    })
+  );
 
   return lyricSource.lyricSourceResult;
 }

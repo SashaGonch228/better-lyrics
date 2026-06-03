@@ -2,8 +2,8 @@ import {
   AUTO_SWITCH_ENABLED_LOG,
   FULLSCREEN_BUTTON_SELECTOR,
   GENERAL_ERROR_LOG,
-  LYRICS_CLASS,
   LOG_PREFIX,
+  LYRICS_CLASS,
   LYRICS_TAB_CLICKED_LOG,
   LYRICS_WRAPPER_ID,
   PAUSING_LYRICS_SCROLL_LOG,
@@ -13,19 +13,33 @@ import {
   TAB_RENDERER_SELECTOR,
   USER_SCROLLING_CLASS,
 } from "@constants";
-import { AppState, handleModifications, reloadLyrics, type PlayerDetails } from "@core/appState";
+import { AppState, handleModifications, type PlayerDetails, reloadLyrics } from "@core/appState";
+import { preFetchLyrics } from "@modules/lyrics/lyrics";
+import { getSongMetadata } from "@modules/lyrics/requestSniffer/requestSniffer";
 import { onAutoSwitchEnabled, onFullScreenDisabled } from "@modules/settings/settings";
-import { animationEngine, animEngineState, getResumeScrollElement } from "@modules/ui/animationEngine";
+import {
+  animationEngine,
+  animEngineState,
+  getResumeScrollElement,
+  resetActiveAnimations,
+} from "@modules/ui/animationEngine";
 import {
   closePlayerPageIfOpenedForFullscreen,
   isNavigating,
   isPlayerPageOpen,
   openPlayerPageForFullscreen,
 } from "@modules/ui/navigation";
-import { getSongMetadata } from "@modules/lyrics/requestSniffer/requestSniffer";
-import { preFetchLyrics } from "@modules/lyrics/lyrics";
 import { log } from "@utils";
-import { addAlbumArtToLayout, cleanup, injectSongAttributes, isLoaderActive, renderLoader } from "./dom";
+import {
+  addThumbnail,
+  cleanup,
+  injectSongAttributes,
+  isLoaderActive,
+  preloadHighResThumbnail,
+  renderLoader,
+  resetThumbnailState,
+  showYtThumbnail,
+} from "./dom";
 
 let wakeLock: WakeLockSentinel | null = null;
 
@@ -40,6 +54,7 @@ let hasInitializedLyricReloader = false;
 let hasInitializedHomepageFullscreen = false;
 let hasInitializedAltHover = false;
 let hasInitializedLyrics = false;
+let metadataAbortController: AbortController | null = null;
 
 async function requestWakeLock(): Promise<void> {
   if (!("wakeLock" in navigator)) {
@@ -63,12 +78,12 @@ function handleVisibilityChange(): void {
   }
 }
 
-export function initWakeLock(): void {
+function initWakeLock(): void {
   requestWakeLock();
   document.addEventListener("visibilitychange", handleVisibilityChange);
 }
 
-export function cleanupWakeLock(): void {
+function cleanupWakeLock(): void {
   if (wakeLock) {
     wakeLock.release();
     wakeLock = null;
@@ -78,7 +93,7 @@ export function cleanupWakeLock(): void {
 
 type FullscreenCallback = () => void;
 
-export function onFullscreenChange(onEnter: FullscreenCallback, onExit: FullscreenCallback): void {
+function onFullscreenChange(onEnter: FullscreenCallback, onExit: FullscreenCallback): void {
   const appLayout = document.querySelector("ytmusic-app-layout");
   if (!appLayout) {
     setTimeout(() => onFullscreenChange(onEnter, onExit), 1000);
@@ -171,6 +186,10 @@ export function disableInertWhenFullscreen(): void {
             const tabSelector = document.getElementsByClassName(TAB_HEADER_CLASS)[1] as HTMLElement;
             if (tabSelector && tabSelector.getAttribute("aria-selected") !== "true") {
               tabSelector.click();
+              currentTab = 1;
+              if (AppState.areLyricsLoaded) {
+                AppState.areLyricsTicking = true;
+              }
             }
           }
         })
@@ -207,7 +226,7 @@ export function lyricReloader(): void {
         setTimeout(() => {
           tabRenderer.scrollTop = scrollPositions[i];
           // Don't start ticking until we set the height
-          AppState.areLyricsTicking = AppState.areLyricsLoaded && AppState.lyricData?.syncType !== "none" && i === 1;
+          AppState.areLyricsTicking = AppState.areLyricsLoaded && i === 1;
         }, 0);
         currentTab = i;
 
@@ -249,6 +268,12 @@ export function initializeLyrics(): void {
   }
   hasInitializedLyrics = true;
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      resetActiveAnimations();
+    }
+  });
+
   // @ts-ignore
   document.addEventListener("blyrics-send-player-time", (event: CustomEvent<PlayerDetails>) => {
     const detail = event.detail;
@@ -260,6 +285,7 @@ export function initializeLyrics(): void {
       AppState.areLyricsTicking = false;
       AppState.lastVideoId = currentVideoId;
       AppState.lastVideoDetails = currentVideoDetails;
+      resetThumbnailState();
       if (!detail.song || !detail.artist) {
         log("Lyrics switched: Still waiting for metadata ", detail.videoId);
         return;
@@ -267,9 +293,28 @@ export function initializeLyrics(): void {
       log(SONG_SWITCHED_LOG, detail.videoId);
 
       AppState.queueLyricInjection = true;
-      AppState.queueAlbumArtInjection = true;
       AppState.queueSongDetailsInjection = true;
       AppState.hasPreloadedNextSong = false;
+
+      metadataAbortController?.abort();
+      const abortController = new AbortController();
+      metadataAbortController = abortController;
+
+      const videoIdAtStart = detail.videoId;
+      getSongMetadata(detail.videoId, 250, abortController.signal).then(async songMetadata => {
+        if (AppState.lastVideoId !== videoIdAtStart) return;
+
+        if (songMetadata?.isVideo && songMetadata.counterpartVideoId) {
+          songMetadata = await getSongMetadata(songMetadata.counterpartVideoId, 10, abortController.signal);
+          if (AppState.lastVideoId !== videoIdAtStart) return;
+        }
+
+        if (songMetadata) {
+          addThumbnail(songMetadata.smallThumbnail);
+        } else {
+          showYtThumbnail();
+        }
+      });
     }
 
     if (AppState.areLyricsTicking && AppState.areLyricsLoaded && !AppState.hasPreloadedNextSong) {
@@ -286,6 +331,7 @@ export function initializeLyrics(): void {
           }
 
           if (next) {
+            preloadHighResThumbnail(next.smallThumbnail);
             await preFetchLyrics(
               {
                 song: next.title,
@@ -303,11 +349,6 @@ export function initializeLyrics(): void {
     if (AppState.queueSongDetailsInjection && detail.song && detail.artist && document.getElementById("main-panel")) {
       AppState.queueSongDetailsInjection = false;
       injectSongAttributes(detail.song, detail.artist);
-    }
-
-    if (AppState.queueAlbumArtInjection && AppState.shouldInjectAlbumArt === true) {
-      AppState.queueAlbumArtInjection = false;
-      addAlbumArtToLayout(currentVideoId);
     }
 
     if (AppState.lyricInjectionFailed) {
@@ -344,8 +385,8 @@ export function initializeLyrics(): void {
  * Manages autoscroll pause/resume functionality.
  */
 export function scrollEventHandler(): void {
-  const tabSelector = document.getElementsByClassName(TAB_HEADER_CLASS)[1];
-  if (tabSelector.getAttribute("aria-selected") !== "true" || !AppState.areLyricsTicking) {
+  const tabSelector = AppState.lyricData?.tabSelector;
+  if (!tabSelector || tabSelector.getAttribute("aria-selected") !== "true" || !AppState.areLyricsTicking) {
     return;
   }
 
@@ -358,13 +399,13 @@ export function scrollEventHandler(): void {
     if (animEngineState.scrollResumeTime < Date.now()) {
       log(PAUSING_LYRICS_SCROLL_LOG);
     }
-    animEngineState.scrollResumeTime = Date.now() + 25000;
-    if (!animEngineState.wasUserScrolling) {
-      getResumeScrollElement().removeAttribute("autoscroll-hidden");
-      const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
-      lyricsElement.classList.add(USER_SCROLLING_CLASS);
-      animEngineState.wasUserScrolling = true;
-    }
+    const isPassive = AppState.lyricData?.syncType === "none";
+    animEngineState.scrollResumeTime = Date.now() + (isPassive ? 5000 : 25000);
+    animEngineState.wasUserScrolling = true;
+
+    getResumeScrollElement().removeAttribute("autoscroll-hidden");
+    const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
+    lyricsElement.classList.add(USER_SCROLLING_CLASS);
   }
 }
 

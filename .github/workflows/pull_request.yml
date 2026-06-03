@@ -1,4 +1,4 @@
-name: Auto-fix Biome Issues
+name: Auto-fix Code Quality Issues
 
 on:
   push:
@@ -56,11 +56,41 @@ jobs:
         if: steps.app-token.outputs.token != ''
         run: npm run lint
 
-      - name: Commit and push changes
+      - name: Run Knip check (fork PRs)
+        id: knip-check
+        if: steps.app-token.outputs.token == ''
+        continue-on-error: true
+        run: npm run knip
+
+      - name: Show Knip fix instructions (fork PRs)
+        if: steps.app-token.outputs.token == '' && steps.knip-check.outcome == 'failure'
+        run: echo "::warning::Knip found unused exports/dependencies. Please run 'npm run knip:fix' locally and push the fixes."
+
+      - name: Run Knip fix
         if: steps.app-token.outputs.token != ''
+        continue-on-error: true
+        run: npm run knip:fix
+
+      - name: Check for changes and last author
+        id: check-changes
+        if: steps.app-token.outputs.token != ''
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes_detected=true" >> $GITHUB_OUTPUT
+            LAST_AUTHOR=$(git log -1 --pretty=format:'%an')
+            if [ "$LAST_AUTHOR" == "better-lyrics-harmonizer[bot]" ]; then
+              echo "::error::Infinite loop detected: Bot found more changes after its own auto-fix. Manual intervention required."
+              exit 1
+            fi
+          else
+            echo "changes_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.app-token.outputs.token != '' && steps.check-changes.outputs.changes_detected == 'true'
         uses: planetscale/ghcommit-action@v0.2.19
         with:
-          commit_message: "Auto-fix: Apply Biome lint and format fixes [skip ci]"
+          commit_message: "Auto-fix: Apply Biome and Knip fixes"
           repo: ${{ github.repository }}
           branch: ${{ github.head_ref || github.ref_name }}
         env:

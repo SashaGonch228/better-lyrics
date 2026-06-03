@@ -1,6 +1,6 @@
-import { compileWithDetails, type CompileError as RicsError, type CompileWarning as RicsWarning } from "rics";
 import { LOG_PREFIX_EDITOR } from "@constants";
 import { truncateSource } from "@utils";
+import { compileWithDetails, type CompileError as RicsError, type CompileWarning as RicsWarning } from "rics";
 
 const COMPILE_TIMEOUT = 3000;
 const MAX_ITERATIONS = 10000;
@@ -16,17 +16,17 @@ function suppressConsoleDuringCompile<T>(fn: () => T): T {
   }
 }
 
-export interface DiagnosticLocation {
+interface DiagnosticLocation {
   line?: number;
   column?: number;
 }
 
-export interface CompileDiagnostic {
+interface CompileDiagnostic {
   message: string;
   location?: DiagnosticLocation;
 }
 
-export interface CompilationState {
+interface CompilationState {
   sourceCode: string;
   compiledCSS: string;
   errors: CompileDiagnostic[];
@@ -34,7 +34,7 @@ export interface CompilationState {
   isValid: boolean;
 }
 
-export class RicsCompilerService {
+class RicsCompilerService {
   private lastCompilationState: CompilationState | null = null;
 
   compile(sourceCode: string): CompilationState {

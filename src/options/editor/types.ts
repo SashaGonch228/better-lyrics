@@ -1,6 +1,6 @@
 export interface ModalOptions {
   title: string;
-  message: string;
+  message: string | Node | Node[];
   inputPlaceholder?: string;
   inputValue?: string;
   confirmText?: string;
@@ -26,4 +26,5 @@ export interface ThemeCardOptions {
   author: string;
   isCustom: boolean;
   index: number;
+  storeId?: string;
 }

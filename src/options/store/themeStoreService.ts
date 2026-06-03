@@ -1,4 +1,4 @@
-import { LOG_PREFIX_STORE, THEME_REGISTRY_BASE, THEME_REGISTRY_URL, THEME_STORE_API_URL } from "@constants";
+import { LOG_PREFIX_STORE, THEME_REGISTRY_URL } from "@constants";
 import type {
   LockfileEntry,
   PermissionStatus,
@@ -7,6 +7,7 @@ import type {
   ThemeLockfile,
   ThemeValidationResult,
 } from "./types";
+
 const DEFAULT_TIMEOUT_MS = 10000;
 
 export async function fetchWithTimeout(
@@ -27,10 +28,6 @@ export async function fetchWithTimeout(
     clearTimeout(timeoutId);
   }
 }
-
-const REGISTRY_ORIGINS = [`${THEME_REGISTRY_BASE}/*`, `${THEME_STORE_API_URL}/*`];
-
-const URL_INSTALL_ORIGINS = ["https://raw.githubusercontent.com/*", "https://api.github.com/*"];
 
 interface BranchCacheEntry {
   branch: string;
@@ -98,30 +95,12 @@ async function getDefaultBranch(repo: string, testFile = "metadata.json"): Promi
   return "main";
 }
 
-export async function checkRegistryPermissions(): Promise<PermissionStatus> {
-  const granted = await chrome.permissions.contains({ origins: REGISTRY_ORIGINS });
-  return { granted, canRequest: true };
-}
-
-export async function requestRegistryPermissions(): Promise<boolean> {
-  return chrome.permissions.request({ origins: REGISTRY_ORIGINS });
-}
-
 export async function checkUrlInstallPermissions(): Promise<PermissionStatus> {
-  const granted = await chrome.permissions.contains({ origins: URL_INSTALL_ORIGINS });
-  return { granted, canRequest: true };
+  return { granted: true, canRequest: true };
 }
 
 export async function requestUrlInstallPermissions(): Promise<boolean> {
-  return chrome.permissions.request({ origins: URL_INSTALL_ORIGINS });
-}
-
-export async function checkStorePermissions(): Promise<PermissionStatus> {
-  return checkRegistryPermissions();
-}
-
-export async function requestStorePermissions(): Promise<boolean> {
-  return requestRegistryPermissions();
+  return true;
 }
 
 function getRegistryFileUrl(themeId: string, file: string): string {
@@ -132,7 +111,7 @@ function getLockfileUrl(): string {
   return `${THEME_REGISTRY_URL}/index.lock.json`;
 }
 
-export async function fetchThemeLockfile(): Promise<ThemeLockfile> {
+async function fetchThemeLockfile(): Promise<ThemeLockfile> {
   const url = `${getLockfileUrl()}?t=${Date.now()}`;
   const response = await fetchWithTimeout(url, { cache: "no-store" });
 
@@ -302,7 +281,7 @@ export async function fetchThemeShaderConfig(
   }
 }
 
-export async function fetchThemeDescription(repo: string, branchOverride?: string): Promise<string | null> {
+async function fetchThemeDescription(repo: string, branchOverride?: string): Promise<string | null> {
   const branch = branchOverride ?? (await getDefaultBranch(repo));
   const url = getRawGitHubUrl(repo, branch, "DESCRIPTION.md");
 
@@ -359,6 +338,18 @@ export async function fetchFullTheme(repo: string, branchOverride?: string): Pro
     cssUrl,
     shaderUrl,
   };
+}
+
+export async function fetchSingleStoreTheme(themeId: string): Promise<StoreTheme | null> {
+  try {
+    const lockfile = await fetchThemeLockfile();
+    const entry = lockfile.themes.find(e => e.id === themeId);
+    if (!entry) return null;
+    return await fetchFullThemeFromRegistry(entry);
+  } catch (err) {
+    console.warn(LOG_PREFIX_STORE, `Failed to fetch single store theme ${themeId}:`, err);
+    return null;
+  }
 }
 
 export async function fetchAllStoreThemes(): Promise<StoreTheme[]> {
@@ -453,7 +444,7 @@ export async function validateThemeRepo(repo: string, branchOverride?: string): 
   };
 }
 
-export interface ParsedGitHubUrl {
+interface ParsedGitHubUrl {
   repo: string;
   branch?: string;
 }

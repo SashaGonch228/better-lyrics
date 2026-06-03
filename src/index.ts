@@ -1,23 +1,27 @@
-import { AppState } from "@core/appState";
 import { INITIALIZE_LOG } from "@constants";
+import { AppState } from "@core/appState";
+import { injectI18nCssVars, loadLocaleOverride, subscribeToLocaleChanges } from "@core/i18n";
 import { purgeExpiredKeys, saveCacheInfo } from "@core/storage";
 import { initProviders } from "@modules/lyrics/providers/shared";
 import { setupRequestSniffer } from "@modules/lyrics/requestSniffer/requestSniffer";
 import {
   handleSettings,
   hideCursorOnIdle,
+  hideDockOnIdleInFullscreen,
   listenForPopupMessages,
+  loadPassiveScrollSetting,
   loadTranslationSettings,
+  loadUnisonPinnedDockSettings,
   onAlbumArtEnabled,
 } from "@modules/settings/settings";
-import { injectHeadTags, setupAdObserver } from "@modules/ui/dom";
+import { injectHeadTags, reloadAlbumArt, setupAdObserver } from "@modules/ui/dom";
 import {
   disableInertWhenFullscreen,
   enableLyricsTab,
   initializeLyrics,
   lyricReloader,
-  setupAltHoverHandler,
   setUpAvButtonListener,
+  setupAltHoverHandler,
   setupHomepageFullscreenHandler,
   setupWakeLockForFullscreen,
 } from "@modules/ui/observer";
@@ -29,9 +33,12 @@ import { log, setUpLog } from "@utils";
  * This method orchestrates the setup of logging, DOM injection, observers, settings,
  * storage, and lyric providers.
  */
-export async function modify(): Promise<void> {
+async function modify(): Promise<void> {
   setUpLog();
   await injectHeadTags();
+  await loadLocaleOverride();
+  injectI18nCssVars();
+  subscribeToLocaleChanges();
   setupAdObserver();
   enableLyricsTab();
   setupHomepageFullscreenHandler();
@@ -39,6 +46,8 @@ export async function modify(): Promise<void> {
   handleSettings();
   setupWakeLockForFullscreen();
   loadTranslationSettings();
+  loadPassiveScrollSetting();
+  loadUnisonPinnedDockSettings(hideDockOnIdleInFullscreen);
   subscribeToCustomStyles();
   await purgeExpiredKeys();
   await saveCacheInfo();
@@ -55,8 +64,14 @@ export async function modify(): Promise<void> {
   );
 
   onAlbumArtEnabled(
-    () => (AppState.shouldInjectAlbumArt = true),
-    () => (AppState.shouldInjectAlbumArt = false)
+    () => {
+      AppState.shouldInjectAlbumArt = true;
+      reloadAlbumArt();
+    },
+    () => {
+      AppState.shouldInjectAlbumArt = false;
+      reloadAlbumArt();
+    }
   );
 }
 
@@ -64,7 +79,7 @@ export async function modify(): Promise<void> {
  * Initializes the application by setting up the DOM content loaded event listener.
  * Entry point for the BetterLyrics extension.
  */
-export function init(): void {
+function init(): void {
   document.addEventListener("DOMContentLoaded", modify);
 }
 

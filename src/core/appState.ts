@@ -1,6 +1,8 @@
-import { GENERAL_ERROR_LOG } from "@constants";
+import { GENERAL_ERROR_LOG, UNISON_DOCK_DEFAULT_POSITION } from "@constants";
 import type { LyricsData } from "@modules/lyrics/injectLyrics";
 import { createLyrics } from "@modules/lyrics/lyrics";
+import type { UnisonData } from "@modules/lyrics/providers/unison";
+import { flushLoader } from "@modules/ui/dom";
 import { log } from "@utils";
 
 export interface PlayerDetails {
@@ -18,7 +20,7 @@ export interface PlayerDetails {
   };
 }
 
-export interface AppStateType {
+interface AppStateType {
   suppressZeroTime: number;
   areLyricsTicking: boolean;
   lyricData: LyricsData | null;
@@ -28,16 +30,23 @@ export interface AppStateType {
   lastVideoDetails: any | null;
   lyricInjectionPromise: Promise<any> | null;
   queueLyricInjection: boolean;
-  queueAlbumArtInjection: boolean;
-  shouldInjectAlbumArt: string | boolean;
+  shouldInjectAlbumArt: "Unknown" | boolean;
   queueSongDetailsInjection: boolean;
   loaderAnimationEndTimeout: number | undefined;
   lastLoadedVideoId: string | null;
   lyricAbortController: AbortController | null;
   isTranslateEnabled: boolean;
   isRomanizationEnabled: boolean;
+  romanizationDisabledLanguages: string[];
+  translationDisabledLanguages: string[];
   translationLanguage: string;
+  isPassiveScrollEnabled: boolean;
   hasPreloadedNextSong: boolean;
+  currentInjectionId: number;
+  isUnisonPinnedDockEnabled: boolean;
+  unisonPinnedDockPosition: string;
+  isUnisonAutoHideInFullscreenEnabled: boolean;
+  currentUnisonData: UnisonData | null;
 }
 
 export const AppState: AppStateType = {
@@ -50,7 +59,6 @@ export const AppState: AppStateType = {
   lastVideoDetails: null,
   lyricInjectionPromise: null,
   queueLyricInjection: false,
-  queueAlbumArtInjection: false,
   shouldInjectAlbumArt: "Unknown",
   queueSongDetailsInjection: false,
   loaderAnimationEndTimeout: undefined,
@@ -58,27 +66,36 @@ export const AppState: AppStateType = {
   lyricAbortController: null,
   isTranslateEnabled: false,
   isRomanizationEnabled: false,
+  romanizationDisabledLanguages: [],
+  translationDisabledLanguages: [],
   translationLanguage: "en",
+  isPassiveScrollEnabled: true,
   hasPreloadedNextSong: false,
+  currentInjectionId: 0,
+  isUnisonPinnedDockEnabled: true,
+  unisonPinnedDockPosition: UNISON_DOCK_DEFAULT_POSITION,
+  isUnisonAutoHideInFullscreenEnabled: true,
+  currentUnisonData: null,
 };
 
 export function reloadLyrics(): void {
+  AppState.lyricAbortController?.abort("Reloading lyrics");
   AppState.lastVideoId = null;
 }
 
 export function handleModifications(detail: PlayerDetails): void {
   if (AppState.lyricInjectionPromise) {
     AppState.lyricAbortController?.abort("New song is being loaded");
-    AppState.lyricInjectionPromise.then(() => {
-      AppState.lyricInjectionPromise = null;
-      handleModifications(detail);
-    });
-  } else {
-    AppState.lyricAbortController = new AbortController();
-    AppState.lyricInjectionPromise = createLyrics(detail, AppState.lyricAbortController.signal).catch(err => {
-      log(GENERAL_ERROR_LOG, err);
-      AppState.areLyricsLoaded = false;
-      AppState.lyricInjectionFailed = true;
-    });
+    // flushLoader(); // Flush loader immediately when aborting
+    // Don't wait for old promise - start new song immediately
+    // Old promise will complete eventually and its finally block will handle cleanup
   }
+
+  AppState.currentInjectionId++;
+  AppState.lyricAbortController = new AbortController();
+  AppState.lyricInjectionPromise = createLyrics(detail, AppState.lyricAbortController.signal).catch(err => {
+    log(GENERAL_ERROR_LOG, err);
+    AppState.areLyricsLoaded = false;
+    AppState.lyricInjectionFailed = true;
+  });
 }

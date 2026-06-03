@@ -3,6 +3,7 @@ import { getLocalStorage, getSyncStorage } from "@core/storage";
 import {
   fetchFullTheme,
   fetchRegistryShaderConfig,
+  fetchSingleStoreTheme,
   fetchThemeCSS,
   fetchThemeMetadata,
   fetchThemeShaderConfig,
@@ -221,7 +222,34 @@ export async function applyStoreTheme(themeId: string): Promise<string> {
   return theme.css;
 }
 
-export function parseVersion(version: string): number[] {
+// -- Symlinked Theme Installs --------------------------
+
+export async function installSymlinkedThemeFromMarketplace(storeId: string): Promise<InstalledStoreTheme | null> {
+  console.log(LOG_PREFIX_STORE, `Installing symlinked theme from marketplace: ${storeId}`);
+
+  const existing = await getInstalledTheme(storeId);
+  if (existing) {
+    console.log(LOG_PREFIX_STORE, `Symlinked theme already installed: ${storeId} v${existing.version}`);
+    return existing;
+  }
+
+  try {
+    const storeTheme = await fetchSingleStoreTheme(storeId);
+    if (!storeTheme) {
+      console.warn(LOG_PREFIX_STORE, `Symlinked theme not found in marketplace: ${storeId}`);
+      return null;
+    }
+
+    const installed = await installTheme(storeTheme, { source: "marketplace" });
+    console.log(LOG_PREFIX_STORE, `Installed symlinked theme: ${storeId} v${installed.version}`);
+    return installed;
+  } catch (err) {
+    console.warn(LOG_PREFIX_STORE, `Failed to install symlinked theme from marketplace: ${storeId}`, err);
+    return null;
+  }
+}
+
+function parseVersion(version: string): number[] {
   const cleanVersion = version.replace(/-.*$/, "");
   return cleanVersion.split(".").map(part => {
     const num = parseInt(part, 10);
@@ -233,7 +261,7 @@ export function parseVersion(version: string): number[] {
   });
 }
 
-export function compareVersions(current: string, required: string): boolean {
+function compareVersions(current: string, required: string): boolean {
   const currentParts = parseVersion(current);
   const requiredParts = parseVersion(required);
 
@@ -254,7 +282,7 @@ export function isVersionCompatible(themeMinVersion: string, extensionVersion: s
   return compareVersions(extensionVersion, themeMinVersion);
 }
 
-export async function checkForThemeUpdates(
+async function checkForThemeUpdates(
   installed: InstalledStoreTheme[],
   storeThemes: StoreTheme[]
 ): Promise<Map<string, StoreTheme>> {
@@ -270,7 +298,7 @@ export async function checkForThemeUpdates(
   return updates;
 }
 
-export async function updateTheme(theme: StoreTheme): Promise<InstalledStoreTheme> {
+async function updateTheme(theme: StoreTheme): Promise<InstalledStoreTheme> {
   return installTheme(theme);
 }
 

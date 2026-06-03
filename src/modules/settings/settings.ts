@@ -1,10 +1,10 @@
-import { LOG_PREFIX_CONTENT, LYRICS_DISABLED_ATTR } from "@constants";
+import { LOG_PREFIX_CONTENT, LYRICS_DISABLED_ATTR, UNISON_DOCK_CLASS, UNISON_DOCK_DEFAULT_POSITION } from "@constants";
 import { AppState, reloadLyrics } from "@core/appState";
 import { clearCache, compileRicsToStyles, getStorage } from "@core/storage";
 import { log, setUpLog } from "@core/utils";
 import { calculateLyricPositions } from "@modules/lyrics/injectLyrics";
 import { clearCache as clearTranslationCache } from "@modules/lyrics/translation";
-import { removeAlbumArtFromLayout } from "@modules/ui/dom";
+import { mountUnisonDock, reloadAlbumArt, unmountUnisonDock, updateUnisonDockPosition } from "@modules/ui/dom";
 import { applyCustomStyles, getAndApplyCustomStyles } from "@modules/ui/styleInjector";
 
 let hasInitializedMessageListener = false;
@@ -90,7 +90,7 @@ export function onAlbumArtEnabled(enableAlbumArt: EnableDisableCallback, disable
   });
 }
 
-export function onStylizedAnimationsEnabled(
+function onStylizedAnimationsEnabled(
   enableAnimations: EnableDisableCallback,
   disableAnimations: EnableDisableCallback
 ): void {
@@ -103,7 +103,7 @@ export function onStylizedAnimationsEnabled(
   });
 }
 
-export function onAutoHideCursor(
+function onAutoHideCursor(
   enableCursorAutoHide: EnableDisableCallback,
   disableCursorAutoHide: EnableDisableCallback
 ): void {
@@ -126,7 +126,9 @@ export function hideCursorOnIdle(): void {
 
       function disappearCursor() {
         mouseTimer = null;
-        document.getElementById("layout")!.setAttribute("cursor-hidden", "");
+        if (cursorVisible) {
+          document.getElementById("layout")!.setAttribute("cursor-hidden", "");
+        }
         cursorVisible = false;
       }
 
@@ -190,12 +192,20 @@ export function listenForPopupMessages(): void {
       hideCursorOnIdle();
       handleSettings();
       loadTranslationSettings();
+      loadPassiveScrollSetting();
+      loadUnisonPinnedDockSettings(() => {
+        syncUnisonDock();
+        hideDockOnIdleInFullscreen();
+      });
       AppState.shouldInjectAlbumArt = "Unknown";
       onAlbumArtEnabled(
-        () => (AppState.shouldInjectAlbumArt = true),
+        () => {
+          AppState.shouldInjectAlbumArt = true;
+          reloadAlbumArt();
+        },
         () => {
           AppState.shouldInjectAlbumArt = false;
-          removeAlbumArtFromLayout();
+          reloadAlbumArt();
         }
       );
       reloadLyrics();
@@ -212,13 +222,104 @@ export function listenForPopupMessages(): void {
   });
 }
 
+export function loadPassiveScrollSetting(): void {
+  getStorage({ isPassiveScrollEnabled: true }, items => {
+    AppState.isPassiveScrollEnabled = items.isPassiveScrollEnabled;
+  });
+}
+
+export function loadUnisonPinnedDockSettings(callback?: () => void): void {
+  getStorage(
+    {
+      isUnisonPinnedDockEnabled: true,
+      unisonPinnedDockPosition: UNISON_DOCK_DEFAULT_POSITION,
+      isUnisonAutoHideInFullscreenEnabled: true,
+    },
+    items => {
+      AppState.isUnisonPinnedDockEnabled = items.isUnisonPinnedDockEnabled;
+      AppState.unisonPinnedDockPosition = items.unisonPinnedDockPosition;
+      AppState.isUnisonAutoHideInFullscreenEnabled = items.isUnisonAutoHideInFullscreenEnabled;
+      callback?.();
+    }
+  );
+}
+
+function syncUnisonDock(): void {
+  if (!AppState.isUnisonPinnedDockEnabled) {
+    unmountUnisonDock();
+    return;
+  }
+  if (AppState.currentUnisonData) {
+    mountUnisonDock(AppState.currentUnisonData, AppState.unisonPinnedDockPosition);
+    updateUnisonDockPosition(AppState.unisonPinnedDockPosition);
+  }
+}
+
+const DOCK_IDLE_HIDDEN_CLASS = `${UNISON_DOCK_CLASS}--idle-hidden`;
+
+let dockIdleTimer: number | null = null;
+let dockMouseListener: ((this: Document, ev: MouseEvent) => any) | null = null;
+
+function setDockIdleHidden(hidden: boolean): void {
+  for (const dock of Array.from(document.getElementsByClassName(UNISON_DOCK_CLASS))) {
+    dock.classList.toggle(DOCK_IDLE_HIDDEN_CLASS, hidden);
+  }
+}
+
+export function hideDockOnIdleInFullscreen(): void {
+  if (dockMouseListener) {
+    document.removeEventListener("mousemove", dockMouseListener);
+    dockMouseListener = null;
+  }
+  if (dockIdleTimer) {
+    window.clearTimeout(dockIdleTimer);
+    dockIdleTimer = null;
+  }
+  setDockIdleHidden(false);
+
+  if (!AppState.isUnisonAutoHideInFullscreenEnabled) return;
+
+  let dockVisible = true;
+
+  function hideDock() {
+    dockIdleTimer = null;
+    if (!dockVisible) return;
+    if (!document.getElementById("layout")?.hasAttribute("player-fullscreened")) return;
+    setDockIdleHidden(true);
+    dockVisible = false;
+  }
+
+  function handleMouseMove() {
+    if (dockIdleTimer) window.clearTimeout(dockIdleTimer);
+    if (!dockVisible) {
+      setDockIdleHidden(false);
+      dockVisible = true;
+    }
+    dockIdleTimer = window.setTimeout(hideDock, 3000);
+  }
+
+  dockMouseListener = handleMouseMove;
+  document.addEventListener("mousemove", handleMouseMove);
+}
+
 /**
  * Loads translation and romanization settings from storage and updates AppState.
  */
 export function loadTranslationSettings(): void {
-  getStorage({ isTranslateEnabled: false, isRomanizationEnabled: false, translationLanguage: "en" }, items => {
-    AppState.isTranslateEnabled = items.isTranslateEnabled;
-    AppState.isRomanizationEnabled = items.isRomanizationEnabled;
-    AppState.translationLanguage = items.translationLanguage || "en";
-  });
+  getStorage(
+    {
+      isTranslateEnabled: false,
+      isRomanizationEnabled: false,
+      translationLanguage: "en",
+      romanizationDisabledLanguages: [],
+      translationDisabledLanguages: [],
+    },
+    items => {
+      AppState.isTranslateEnabled = items.isTranslateEnabled;
+      AppState.isRomanizationEnabled = items.isRomanizationEnabled;
+      AppState.translationLanguage = items.translationLanguage || "en";
+      AppState.romanizationDisabledLanguages = items.romanizationDisabledLanguages || [];
+      AppState.translationDisabledLanguages = items.translationDisabledLanguages || [];
+    }
+  );
 }

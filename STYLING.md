@@ -55,15 +55,23 @@
 		- [Styling Instrumental Breaks](#styling-instrumental-breaks)
 		- [Data Attributes](#data-attributes)
 	- [18. Autoscroll Resume Button](#18-autoscroll-resume-button)
-	- [19. Best Practices for Modifying CSS](#19-best-practices-for-modifying-css)
-	- [20. Importing/Exporting Styles](#20-importingexporting-styles)
-	- [21. Additional Resources](#21-additional-resources)
+	- [19. Unison Submitter Card and Floating Dock](#19-unison-submitter-card-and-floating-dock)
+		- [New CSS Variables](#new-css-variables)
+		- [Footer Card](#footer-card)
+		- [Submitter Block](#submitter-block)
+		- [Trust Tier Pill](#trust-tier-pill)
+		- [Vote Button](#vote-button)
+		- [Floating Dock](#floating-dock)
+		- [Hide and Idle States](#hide-and-idle-states)
+	- [20. Best Practices for Modifying CSS](#20-best-practices-for-modifying-css)
+	- [21. Importing/Exporting Styles](#21-importingexporting-styles)
+	- [22. Additional Resources](#22-additional-resources)
 
 ## 1. Introduction to CSS and Better Lyrics
 
 CSS (Cascading Style Sheets) is a styling language used to describe the presentation of a document written in HTML or XML. It allows you to control the layout, colors, fonts, and other visual aspects of web pages.
 
-The Better Lyrics CSS files are designed to enhance the lyrics viewing experience on YouTube Music. They modify the appearance of the lyrics display, add animations, and adjust the layout to create a more immersive and user-friendly experience.
+The Better Lyrics CSS files are designed to enhance the lyrics viewing experience on YouTube Music™. They modify the appearance of the lyrics display, add animations, and adjust the layout to create a more immersive and user-friendly experience.
 
 The extension lets you modify the CSS in real-time, so you can see the changes immediately.
 
@@ -71,10 +79,20 @@ If you're new to CSS, don't worry! This guide will walk you through the main com
 
 ## 2. Understanding the CSS Structure
 
-The Better Lyrics styling system consists of three main CSS files, each serving a specific purpose:
+The Better Lyrics styling system consists of several modular CSS files, organized into directories:
 
-1. **blyrics.css** - Core lyrics styling, animations, and visual effects
-2. **ytmusic.css** - YouTube Music interface modifications and layout adjustments
+1. **blyrics/** - Core lyrics styling, animations, and visual effects
+    - `variables.css`: Global custom properties
+    - `lyrics.css`: Main lyrics container and line styles, translations, romanization
+    - `components.css`: UI components like the loader, footer, and buttons
+    - `instrumental.css`: Instrumental break styles
+    - `misc.css`: Utility classes
+    - `responsive.css`: Media queries for responsive design
+2. **ytmusic/** - YouTube Music interface modifications and layout adjustments
+    - `variables.css`: YouTube Music specific variables
+    - `general.css`: General interface overrides
+    - `fullscreen.css`: Fullscreen mode styles
+    - `mobile.css`: Mobile-specific adjustments
 3. **themesong.css** - Compatibility styles for the ThemeSong browser extension
 
 Each file is organized into logical sections:
@@ -91,7 +109,7 @@ Each section uses CSS selectors to target specific HTML elements and apply style
 
 ## 3. Custom Properties (CSS Variables)
 
-At the beginning of `blyrics.css`, you'll see a `:root` selector with custom properties that define the visual theme and behavior of Better Lyrics:
+In `blyrics/variables.css`, you'll see a `:root` selector with custom properties that define the visual theme and behavior of Better Lyrics:
 
 ```css
 :root {
@@ -123,7 +141,7 @@ These custom properties allow for easy customization of colors, sizes, and other
 
 | Variable                           | Default Value                                                                                                                                                        | Description                                                              |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `--blyrics-font-family`            | `Satoshi, var(--noto-sans-universal), Avenir, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif` | Font family for lyrics¹                                                  |
+| `--blyrics-font-family`¹           | `Satoshi, var(--noto-sans-universal), Avenir, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif` | Font family for lyrics                                                 |
 | `--blyrics-font-size`              | `3rem`                                                                                                                                                               | Font size for lyrics                                                     |
 | `--blyrics-font-weight`            | `700`                                                                                                                                                                | Font weight for lyrics                                                   |
 | `--blyrics-line-height`            | `1.333`                                                                                                                                                              | Line height for lyrics                                                   |
@@ -134,7 +152,7 @@ These custom properties allow for easy customization of colors, sizes, and other
 | `--blyrics-footer-font-family`     | `Roboto, Noto Naskh Arabic UI, Arial, sans-serif`                                                                                                                    | Font family of footer                                                    |
 | `--blyrics-footer-font-size`       | `14px`                                                                                                                                                               | Font size of footer                                                      |
 | `--blyrics-footer-font-weight`     | `400`                                                                                                                                                                | Font weight of footer                                                    |
-| `--noto-sans-universal`            | Omitted                                                                                                                                                              | A family of NotoSans fonts covering a large majority of langauges used.² |
+| `--noto-sans-universal`²           | Omitted                                                                                                                                                              | A family of NotoSans fonts covering a large majority of langauges used.  |
 
 ¹To add a custom web-font, use `@import`. It must be placed at the very top of your theme.
 
@@ -142,9 +160,11 @@ These custom properties allow for easy customization of colors, sizes, and other
 
 ### Animations
 
-| Variable                                      | Default Value | Description                                                                                     |
-| --------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
-| `--blyrics-scale-transition-duration`         | `0.166s`      | Transition duration of scale effect                                                             |
+| Variable                                      | Default Value                        | Description                                                                                     |
+| --------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `--blyrics-loader-transition-duration`        | `0.6s`                               | Duration of loader enter/exit transitions                                                       |
+| `--blyrics-loader-transition-easing`          | `cubic-bezier(0.22, 1, 0.36, 1)`    | Easing curve for loader enter/exit transitions                                                  |
+| `--blyrics-scale-transition-duration`         | `0.166s`                             | Transition duration of scale effect                                                             |
 | `--blyrics-lyric-highlight-fade-in-duration`  | `0.33s`       | Controls duration of fade in transition                                                         |
 | `--blyrics-lyric-highlight-fade-out-duration` | `0.5s`        | Controls duration of fade out transition                                                        |
 | `--blyrics-wobble-duration`                   | `1s`          | Controls duration of wobble animation                                                           |
@@ -154,15 +174,17 @@ These custom properties allow for easy customization of colors, sizes, and other
 
 ### Layout
 
-| Variable                                | Default Value | Description                                       |
-| --------------------------------------- | ------------- | ------------------------------------------------- |
-| `--blyrics-padding`                     | `2rem`        | Standard padding                                  |
-| `--blyrics-margin`                      | `2rem`        | Standard margin                                   |
-| `--blyrics-border-radius`               | `1000rem`     | Standard border radius                            |
-| `--blyrics-panel-size `                 | `50%`         | Size of lyrics panel (not fullscreen, audio only) |
-| `--blyrics-video-panel-size`            | `30%`         | Size of lyrics panel (not fullscreen, video mode) |
-| `--blyrics-fullscreen-panel-size`       | `66%`         | Size of lyrics panel (fullscreen, audio only)     |
-| `--blyrics-fullscreen-video-panel-size` | `25%`         | Size of lyrics panel (fullscreen, video mode)     |
+| Variable                                | Default Value | Description                                                                                    |
+| --------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `--blyrics-padding`                     | `2rem`        | Standard padding                                                                               |
+| `--blyrics-margin`                      | `2rem`        | Standard margin                                                                                |
+| `--blyrics-border-radius`               | `1000rem`     | Standard border radius                                                                         |
+| `--blyrics-padding-top`                 | (dynamic)     | Extra top padding for always-scrollable lyrics (calculated automatically)                      |
+| `--blyrics-padding-bottom`              | (dynamic)     | Extra bottom padding for always-scrollable lyrics (calculated automatically)                   |
+| `--blyrics-panel-size `                 | `50%`         | Size of lyrics panel (not fullscreen, audio only)                                              |
+| `--blyrics-video-panel-size`            | `30%`         | Size of lyrics panel (not fullscreen, video mode)                                              |
+| `--blyrics-fullscreen-panel-size`       | `66%`         | Size of lyrics panel (fullscreen, audio only)                                                  |
+| `--blyrics-fullscreen-video-panel-size` | `25%`         | Size of lyrics panel (fullscreen, video mode)                                                  |
 
 ### Effects
 
@@ -179,8 +201,11 @@ These custom properties allow for easy customization of colors, sizes, and other
 
 | Variable                                 | Default Value                    | Description                                     |
 | ---------------------------------------- | -------------------------------- | ----------------------------------------------- |
-| `--blyrics-lyric-scroll-duration`        | `750ms`                          | Duration for scrolling lyric transitions        |
+| `--blyrics-lyric-scroll-duration`³       | `750ms`                          | Duration for scrolling lyric transitions        |
 | `--blyrics-lyric-scroll-timing-function` | `cubic-bezier(0.86, 0, 0.07, 1)` | Timing function for scrolling lyric transitions |
+
+³Modifying this variable alone may introduce glitches to lyric-scroll animation. To maintain smoothness, you should also adjust  `blyrics-early-scroll-consider-s` +
+`blyrics-queue-scroll-ms` knobs. See [Additional Configuration Options (Knobs)](#additional-configuration-options-knobs) for details.
 
 ### Gradient Stops
 
@@ -227,15 +252,27 @@ The following options are avalible:
 | `blyrics-disable-richsync`            | `false`       | Set to `true` to disable richsynced lyrics from displaying.                                                                                |
 | `blyrics-line-synced-animation-delay` | `50`          | For non-richsynced lyrics, this value controls the delay each word gets when highlighting (in ms).                                         |
 | `blyrics-lyric-ending-threshold-s`    | `0.5`         | Controls the time (in seconds) before a lyric line is finished that we consider it completed for scrolling purposes.                       |
-| `blyrics-early-scroll-consider-s`     | `0.62`        | Controls how far into the future (in seconds) we should look for lines to group together for scrolling purposes.                           |
-| `blyrics-queue-scroll-ms`             | `150`         | If we're unable to scroll due to having scrolled recently, what is the maximum amount of time that a scroll can be "queued" for.           |
+| `blyrics-early-scroll-consider-s`⁴    | `0.62`        | Controls how far into the future (in seconds) we should look for lines to group together for scrolling purposes.                           |
+| `blyrics-queue-scroll-ms`⁴            | `150`         | If we're unable to scroll due to having scrolled recently, what is the maximum amount of time that a scroll can be "queued" for.           |
 | `blyrics-debug-renderer`              | `false`       | Set to `true` to enable the debug renderer.                                                                                                |
 | `blyrics-target-scroll-pos-ratio`     | `0.37`        | Position on the screen lyrics should be at. 0.5 means the selected lyric will be in the middle of the screen, 0 means top, 1 means bottom. |
-| `blyrics-add-extra-top-padding`       | `false`       | Should extra spacing be added to the top of the lyrics container to allow the lyrics to always scroll.                                     |
+| `blyrics-long-word-threshold`         | `1500`        | Duration threshold (in ms) above which words get `data-long-word="true"`. Useful for glow effects on held notes.                           |
+| `blyrics-hide-instrumental-only`      | `false`       | Treat "[Instrumental Only]" as no lyrics (enables fullscreen effect).                                                                      |
+| `blyrics-passive-scroll-enabled`          | `true`    | Enable/disable unsynced lyrics auto-scroll entirely. Overrides the user setting when set to `false`.                                       |
+| `blyrics-passive-scroll-seconds-per-line` | `3.5`     | For unsynced lyrics auto-scroll: seconds spent scrolling per lyric line. Controls overall scroll speed.                                    |
+| `blyrics-passive-scroll-bottom-pause-s`   | `1.5`     | For unsynced lyrics auto-scroll: seconds to pause at the bottom before scrolling back to top.                                              |
+| `blyrics-passive-scroll-reset-duration-s` | `0.6`     | For unsynced lyrics auto-scroll: seconds for the scroll-back-to-top animation.                                                             |
+| `blyrics-passive-scroll-top-pause-s`      | `0.8`     | For unsynced lyrics auto-scroll: seconds to pause at the top before scrolling down again.                                                  |
 
-Tip:
-Make it so `var(--blyrics-lyric-scroll-duration)` + `0.02s` = `blyrics-early-scroll-consider-s` +
+⁴Make sure that the following equation is met
+
+`var(--blyrics-lyric-scroll-duration)` + `0.02s` = `blyrics-early-scroll-consider-s` +
 `blyrics-queue-scroll-ms`
+
+An unbalanced equation may cause dropped frames or missed scrolls. The default values of all three variables are already balanced.
+
+Tip: Pay attention to the units of the values; Some values are in *seconds* (s), while others are in *milliseconds* (ms).
+
 ### Dynamic Properties
 
 `--blyrics-duration` is a special custom property that is set dynamically by the extension's main script. It represents the duration of the current lyric line and is used to ensure that animations are synchronized with the music playback.
@@ -257,7 +294,7 @@ The main container for the lyrics is styled using the `.blyrics-container` class
   z-index: 1;
   transition: transform var(--blyrics-lyric-scroll-duration) var(--blyrics-lyric-scroll-timing-function) 0s;
   padding-top: 2rem;
-  padding-bottom: 0;
+  padding-bottom: calc(var(--blyrics-padding-bottom));
 }
 ```
 
@@ -314,7 +351,7 @@ Use `data-loader-visible` to adjust styles when the loader is active:
 
 ## 5. Styling Individual Lyric Lines
 
-Animating lyrics is a multi-step process involving various classes and properties that work together to ensure smooth, timed transitions even if the browser stutters. When a div or span has an active or animating class, it doesn't necessarily mean it's currently "active" or animating—these classes are applied early, and the code later inserts specific animation/transition delays to trigger effects at the correct time.
+Animating lyrics is a multi-step process involving various classes and properties that work together to ensure smooth, timed transitions even if the browser stutters. When a div or span has an active or animating class, it doesn't necessarily mean it's currently "active" or animating. These classes are applied early, and the code later inserts specific animation/transition delays to trigger effects at the correct time.
 
 ### Base Structure
 
@@ -390,6 +427,33 @@ Every word uses the `.blyrics--word` class:
 - **Color**: Set to inactive color initially
 - **Display**: `inline-block` preserves spacing and layout
 - **Transform**: `translateY(0px)` prevents layout issues
+
+#### Word Data Attributes
+
+Each word span has the following data attributes:
+
+| Attribute        | Description                                                                 |
+| ---------------- | --------------------------------------------------------------------------- |
+| `data-time`      | Start time of the word in seconds                                           |
+| `data-duration`  | Duration of the word in seconds                                             |
+| `data-content`   | The word text (used by `::after` pseudo-element for karaoke effect)         |
+| `data-long-word` | Present (with value `"true"`) when word duration exceeds the threshold      |
+
+#### Targeting Long Words
+
+Words with duration exceeding `blyrics-long-word-threshold` (default: 1500ms) get `data-long-word="true"`. This is useful for adding glow effects to held/sustained notes:
+
+```css
+/* Set the threshold (in ms) */
+/* blyrics-long-word-threshold = 1500; */
+
+/* Add glow effect to long words */
+.blyrics--word[data-long-word]::after {
+  --blyrics-glow-color: color(display-p3 1 1 1 / 1);
+}
+```
+
+Changing the threshold triggers a lyric reload automatically.
 
 ### Applying the Wobble Animation
 
@@ -557,7 +621,7 @@ These animations create:
 
 ## 7. Modifying YouTube Music's Layout
 
-The `ytmusic.css` file contains extensive modifications to YouTube Music's interface to create a more immersive lyrics experience.
+The `ytmusic/` directory contains extensive modifications to YouTube Music™'s interface to create a more immersive lyrics experience.
 
 ### Background and Transparency Effects
 
@@ -620,7 +684,7 @@ Ensures the lyrics panel has adequate space for comfortable reading. The `33em` 
 
 #blyrics-loader:before {
   animation: blyrics-spin 1s linear infinite;
-  background: url(https://better-lyrics.boidu.dev/icon-512.png);
+  background: url(https://betterlyrics.org/icon-512.png);
   background-position: 50%;
   background-size: cover;
   content: "";
@@ -1141,7 +1205,148 @@ To customize instrumental breaks:
 
 Creates an elegant button that appears when autoscroll is paused, with smooth show/hide transitions.
 
-## 19. Best Practices for Modifying CSS
+## 19. Unison Submitter Card and Floating Dock
+
+When a song is served by the Unison provider, the extension injects two extra UI blocks into the YouTube Music page: a submitter card inside the lyrics footer, and a floating dock anchored to the side panel. Both are themeable from your custom CSS the same way as everything else on this page. Class names follow the existing `blyrics-footer__*` and `blyrics-unison-*` conventions.
+
+### New CSS Variables
+
+| Variable | Default Value | Description |
+| -------- | ------------- | ----------- |
+| `--blyrics-vote-hover-color` | `hsla(0, 0%, 100%, 0.2)` | Background of vote and report buttons on hover |
+| `--blyrics-small-border-radius` | `1rem` | Border radius for vote buttons |
+| `--blyrics-fullscreen-bottom-dock-shift` | `-24px` | Y-offset applied to bottom-anchored docks in fullscreen. Lifts the dock above the player bar so it stays reachable. Negative values move up |
+
+### Footer Card
+
+When the Unison provider is active, an extra card is appended to the lyrics footer. The card opens the standalone Unison page in a new tab when clicked anywhere outside the buttons.
+
+```html
+<div class="blyrics-footer__unison">
+  <div class="blyrics-footer__container blyrics-footer__unison-card">
+    <div class="blyrics-footer__unison-author">
+      <div class="blyrics-footer__unison-author-row">
+        <strong class="blyrics-footer__author-name">PetName</strong>
+        <span class="blyrics-footer__trust-tier" data-tier="trusted">Trusted</span>
+      </div>
+      <div class="blyrics-footer__unison-author-label">submitted this</div>
+    </div>
+    <div class="blyrics-footer__unison-divider"></div>
+    <div class="blyrics-footer__unison-actions-block">
+      <div class="blyrics-footer__unison-actions">
+        <button class="blyrics-footer__vote">…</button>
+        <button class="blyrics-footer__vote">…</button>
+        <button class="blyrics-footer__vote">…</button>
+      </div>
+      <div class="blyrics-footer__unison-score-line">
+        <strong>+12</strong> <span>score</span> · <strong>12</strong> <span>votes</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+| Class | Purpose |
+| ----- | ------- |
+| `.blyrics-footer__unison` | Outer wrapper for the card. Forces full-width inside the footer |
+| `.blyrics-footer__unison-card` | Combined with `.blyrics-footer__container`. Translucent rounded card with hover lighten |
+| `.blyrics-footer__unison-divider` | 1px vertical line between submitter block and actions block. Only present when there is a submitter |
+| `.blyrics-footer__unison-actions-block` | Right column. Holds the action row plus the score line |
+| `.blyrics-footer__unison-actions` | Row of three buttons: upvote, downvote, report |
+| `.blyrics-footer__unison-score-line` | Score and vote-count line beneath the actions |
+
+### Submitter Block
+
+| Class | Purpose |
+| ----- | ------- |
+| `.blyrics-footer__unison-author` | Column with author row plus subtitle |
+| `.blyrics-footer__unison-author-row` | Row holding the author name and the trust tier pill |
+| `.blyrics-footer__author-name` | The submitter handle. Generated from their public key as a deterministic pet name |
+| `.blyrics-footer__unison-author-label` | Small "submitted this" label below the author row |
+
+### Trust Tier Pill
+
+The tier pill colors itself based on a `data-tier` attribute. Tier is derived from the submitter's reputation in `getTrustTier()`.
+
+| Selector | Color |
+| -------- | ----- |
+| `.blyrics-footer__trust-tier[data-tier="new"]` | Blue |
+| `.blyrics-footer__trust-tier[data-tier="trusted"]` | Green |
+| `.blyrics-footer__trust-tier[data-tier="veteran"]` | Purple |
+| `.blyrics-footer__trust-tier[data-tier="expert"]` | Gold |
+
+To restyle, target `.blyrics-footer__trust-tier[data-tier="<tier>"]` and override `color` and `background-color`.
+
+### Vote Button
+
+The same button class is reused for upvote, downvote, and report buttons in both the footer card and the floating dock.
+
+| Class | Purpose |
+| ----- | ------- |
+| `.blyrics-footer__vote` | Base style. 30px square, rounded, glassy background. Hover uses `--blyrics-vote-hover-color` |
+| `.blyrics-footer__vote--active` | Active state. The SVG path with `fill-opacity` becomes fully opaque |
+
+Inside the floating dock, vote buttons are scaled up to 32px square via the `.blyrics-unison-dock__inner .blyrics-footer__vote` selector.
+
+### Floating Dock
+
+A second copy of the vote buttons floats over the side panel so they remain reachable while the user scrolls past the footer card.
+
+```html
+<div class="blyrics-unison-dock" data-position="top-center">
+  <div class="blyrics-unison-dock__inner">
+    <button class="blyrics-footer__vote">…</button>
+    <button class="blyrics-footer__vote">…</button>
+    <button class="blyrics-footer__vote">…</button>
+  </div>
+</div>
+```
+
+| Class | Purpose |
+| ----- | ------- |
+| `.blyrics-unison-dock` | Absolute-positioned wrapper inside `#side-panel`. `pointer-events: none` so empty space stays click-through |
+| `.blyrics-unison-dock__inner` | The actual button group. Glass background, blur, `pointer-events: auto` |
+
+The dock chooses one of six anchor positions via the `data-position` attribute:
+
+| Value | Anchor |
+| ----- | ------ |
+| `top-left` | `top: 64px; left: 0` |
+| `top-center` | `top: 64px; left: 50%` (translated -50% via `--dock-tx`) |
+| `top-right` | `top: 64px; left: 100%` (translated -100%) |
+| `bottom-left` | `top: calc(100% - 64px); left: 0` |
+| `bottom-center` | `top: calc(100% - 64px); left: 50%` |
+| `bottom-right` | `top: calc(100% - 64px); left: 100%` |
+
+When the autoscroll resume button is visible, the `top-center` dock shifts down by 72px via `--dock-y-shift` so the two controls do not overlap.
+
+### Hide and Idle States
+
+| Class | Purpose |
+| ----- | ------- |
+| `.blyrics-unison-dock--hidden` | Applied while the footer card is in the viewport. The dock fades, blurs, and scales down so the user only sees one set of controls at a time |
+| `.blyrics-unison-dock--idle-hidden` | Applied while the player is idle in fullscreen. Hides the dock with the same animation when controls auto-hide |
+
+Both states animate `transform`, `opacity`, and `filter: blur` over 320ms.
+
+A few related rules ship in the YTM stylesheets and you may want to override them:
+
+```css
+/* Hide the dock when the side panel is showing something other than lyrics */
+#side-panel:has(#tab-renderer:not([page-type="MUSIC_PAGE_TYPE_TRACK_LYRICS"])) .blyrics-unison-dock { … }
+
+/* Hide top-anchored docks in fullscreen */
+#layout[player-fullscreened]:not([blyrics-dfs]) .blyrics-unison-dock[data-position^="top-"] { … }
+
+/* Pin bottom-anchored docks above the player bar in fullscreen */
+#layout[player-fullscreened]:not([blyrics-dfs]) .blyrics-unison-dock[data-position^="bottom-"] {
+  --dock-y-shift: var(--blyrics-fullscreen-bottom-dock-shift, -24px);
+}
+```
+
+Override `--blyrics-fullscreen-bottom-dock-shift` to tune the lift distance.
+
+## 20. Best Practices for Modifying CSS
 
 When modifying this CSS:
 
@@ -1156,7 +1361,7 @@ When modifying this CSS:
 9. **Consider performance** - Avoid overly complex animations that might cause lag
 10. **Have fun** - CSS is about creativity and expression!
 
-## 20. Importing/Exporting Styles
+## 21. Importing/Exporting Styles
 
 The Better Lyrics extension allows you to import and export custom CSS styles for sharing and backup purposes.
 
@@ -1175,7 +1380,7 @@ The Better Lyrics extension allows you to import and export custom CSS styles fo
 
 Share your custom themes with the [Better Lyrics community on Discord](https://discord.gg/UsHE3d5fWF) and get featured in the extension!
 
-## 21. Additional Resources
+## 22. Additional Resources
 
 To learn more about CSS and web development:
 

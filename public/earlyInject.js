@@ -18,8 +18,8 @@ window.fetch = async function (request, init) {
   const urlString = typeof request === "string" ? request : request.url;
 
   if (
-    urlString.includes("https://music.youtube.com/youtubei/v1/browse") ||
-    urlString.includes("https://music.youtube.com/youtubei/v1/next")
+    urlString.startsWith("https://music.youtube.com/youtubei/v1/browse") ||
+    urlString.startsWith("https://music.youtube.com/youtubei/v1/next")
   ) {
     try {
       const requestToFetch = typeof request === "string" ? request : request.clone();
@@ -34,10 +34,33 @@ window.fetch = async function (request, init) {
       // Only read the request body if it's a POST request
       let requestBodyPromise;
       if (method.toUpperCase() === "POST") {
-        requestBodyPromise = originalRequestForJson.text().catch(e => {
-          console.error("Better Lyrics: Error reading request text:", e);
-          return "{}";
-        });
+        const contentEncoding = originalRequestForJson.headers.get("content-encoding")?.toLowerCase();
+        if (
+          (contentEncoding === "gzip" || contentEncoding === "deflate") &&
+          typeof DecompressionStream !== "undefined"
+        ) {
+          requestBodyPromise = originalRequestForJson
+            .arrayBuffer()
+            .then(async buffer => {
+              try {
+                const ds = new DecompressionStream(contentEncoding);
+                const decompressedStream = new Response(buffer).body.pipeThrough(ds);
+                return await new Response(decompressedStream).text();
+              } catch (e) {
+                console.error("Better Lyrics: Error decompressing request body:", e);
+                return "{}";
+              }
+            })
+            .catch(e => {
+              console.error("Better Lyrics: Error reading request arrayBuffer:", e);
+              return "{}";
+            });
+        } else {
+          requestBodyPromise = originalRequestForJson.text().catch(e => {
+            console.error("Better Lyrics: Error reading request text:", e);
+            return "{}";
+          });
+        }
       } else {
         // For GET or other methods, resolve immediately with an empty object string
         requestBodyPromise = Promise.resolve("{}");

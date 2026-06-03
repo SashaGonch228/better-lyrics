@@ -1,51 +1,64 @@
 import {
   BACKGROUND_LYRIC_CLASS,
+  EXPLICIT_WORD_CLASS,
+  HAS_TRAILING_SPACE_CLASS,
   LOG_PREFIX,
   LYRICS_CLASS,
   LYRICS_FOUND_LOG,
-  LYRICS_SPACING_ELEMENT_ID,
   LYRICS_TAB_NOT_DISABLED_LOG,
   LYRICS_WRAPPER_ID,
   LYRICS_WRAPPER_NOT_VISIBLE_LOG,
   NO_LYRICS_FOUND_LOG,
-  NO_LYRICS_TEXT,
   NO_LYRICS_TEXT_SELECTOR,
-  romanizationLanguages,
+  ROMANIZATION_LANGUAGES,
   ROMANIZED_LYRICS_CLASS,
   RTL_CLASS,
   SYNC_DISABLED_LOG,
+  TAB_HEADER_CLASS,
   TRANSLATED_LYRICS_CLASS,
   TRANSLATION_ENABLED_LOG,
   WORD_CLASS,
   ZERO_DURATION_ANIMATION_CLASS,
 } from "@constants";
 import { AppState } from "@core/appState";
-import { containsNonLatin, testRtl } from "@modules/lyrics/lyricParseUtils";
+import { t } from "@core/i18n";
 import { createInstrumentalElement } from "@modules/lyrics/createInstrumentalElement";
+import { containsNonLatin, detectNonLatinLanguage, testRtl } from "@modules/lyrics/lyricParseUtils";
 import { applySegmentMapToLyrics, type LyricSourceResultWithMeta } from "@modules/lyrics/lyrics";
 import type { Lyric, LyricPart } from "@modules/lyrics/providers/shared";
-import type { TranslationResult } from "@modules/lyrics/translation";
+import type { UnisonData } from "@modules/lyrics/providers/unison";
 import {
   getRomanizationFromCache,
   getTranslationFromCache,
-  onRomanizationEnabled,
-  onTranslationEnabled,
-  translateText,
-  translateTextIntoRomaji,
+  romanizeBatch,
+  translateBatch,
 } from "@modules/lyrics/translation";
-import {
-  ADD_EXTRA_PADDING_TOP,
-  animEngineState,
-  lyricsElementAdded,
-  SCROLL_POS_OFFSET_RATIO,
-} from "@modules/ui/animationEngine";
-import { addFooter, addNoLyricsButton, cleanup, createLyricsWrapper, flushLoader, renderLoader } from "@modules/ui/dom";
-import { getRelativeBounds, log } from "@utils";
-import { resizeCanvas } from "@modules/ui/animationEngineDebug";
 import { registerThemeSetting } from "@modules/settings/themeOptions";
+import { animEngineState, lyricsElementAdded } from "@modules/ui/animationEngine";
+import { resizeCanvas } from "@modules/ui/animationEngineDebug";
+import {
+  addFooter,
+  addNoLyricsButton,
+  cleanup,
+  createLyricsWrapper,
+  flushLoader,
+  renderLoader,
+  setExtraHeight,
+} from "@modules/ui/dom";
+import { getRelativeBounds, langCodesMatch, languageMatchesAny, log } from "@utils";
 
 let disableRichsync = registerThemeSetting("blyrics-disable-richsync", false, true);
 let lineSyncedAnimationDelay = registerThemeSetting("blyrics-line-synced-animation-delay", 50, true);
+let longWordThreshold = registerThemeSetting("blyrics-long-word-threshold", 1500, true);
+let longWordWrapThreshold = registerThemeSetting("blyrics-long-word-wrap-threshold", 5, true);
+
+function isRomanizationDisabledForLang(lang: string): boolean {
+  return languageMatchesAny(lang, AppState.romanizationDisabledLanguages);
+}
+
+function isTranslationDisabledForLang(lang: string): boolean {
+  return languageMatchesAny(lang, AppState.translationDisabledLanguages);
+}
 
 function findNearestAgent(lyrics: Lyric[], fromIndex: number): string | undefined {
   for (let i = fromIndex - 1; i >= 0; i--) {
@@ -61,19 +74,48 @@ function findNearestAgent(lyrics: Lyric[], fromIndex: number): string | undefine
   return undefined;
 }
 
-const resizeObserver = new ResizeObserver(entries => {
-  for (const entry of entries) {
-    if (entry.target.id === LYRICS_WRAPPER_ID) {
-      if (
-        AppState.lyricData &&
-        (entry.target.clientWidth !== AppState.lyricData.lyricWidth ||
-          entry.target.clientHeight !== AppState.lyricData.lyricHeight)
-      ) {
-        calculateLyricPositions();
-      }
+function isNearestLyricRtl(lyrics: Lyric[], fromIndex: number): boolean {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (!lyrics[i].isInstrumental && lyrics[i].words?.trim()) {
+      return testRtl(lyrics[i].words);
     }
   }
-});
+  for (let i = fromIndex + 1; i < lyrics.length; i++) {
+    if (!lyrics[i].isInstrumental && lyrics[i].words?.trim()) {
+      return testRtl(lyrics[i].words);
+    }
+  }
+  return false;
+}
+
+let resizeObserver: ResizeObserver | null = null;
+
+function getResizeObserver(): ResizeObserver {
+  if (!resizeObserver) {
+    resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (entry.target.id === LYRICS_WRAPPER_ID) {
+          if (
+            AppState.lyricData &&
+            (entry.target.clientWidth !== AppState.lyricData.lyricWidth ||
+              entry.target.clientHeight !== AppState.lyricData.lyricHeight)
+          ) {
+            animEngineState.doneFirstInstantScroll = false;
+            animEngineState.nextScrollAllowedTime = 0;
+            calculateLyricPositions();
+          }
+        }
+      }
+    });
+  }
+  return resizeObserver;
+}
+
+export function disconnectResizeObserver(): void {
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
+}
 
 export interface PartData {
   /**
@@ -89,18 +131,13 @@ export interface PartData {
   animationStartTimeMs: number;
 }
 
-export interface InstrumentalElements {
-  waveClip: SVGElement;
-  wavePath: SVGElement;
-  fill: SVGElement;
-}
-
 export type LineData = {
   parts: PartData[];
   isScrolled: boolean;
   isAnimationPlayStatePlaying: boolean;
   accumulatedOffsetMs: number;
   isAnimating: boolean;
+  lastAnimSetupAt: number;
   isSelected: boolean;
   height: number;
   position: number;
@@ -114,6 +151,8 @@ export interface LyricsData {
   lyricWidth: number;
   lyricHeight: number;
   isMusicVideoSynced: boolean;
+  tabSelector: HTMLElement;
+  lyricsContainer: HTMLElement;
 }
 
 /**
@@ -122,10 +161,11 @@ export interface LyricsData {
  *
  * @param data - Processed lyrics data
  * @param keepLoaderVisible
+ * @param signal - AbortSignal to cancel async operations
  * @param data.language - Language code for the lyrics
  * @param data.lyrics - Array of lyric lines
  */
-export function processLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false): void {
+export function processLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false, signal?: AbortSignal): void {
   const lyrics = data.lyrics;
   if (!lyrics || lyrics.length === 0) {
     throw new Error(NO_LYRICS_FOUND_LOG);
@@ -140,12 +180,60 @@ export function processLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible
 
   try {
     const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
-    lyricsElement.innerHTML = "";
+    lyricsElement.replaceChildren();
   } catch (_err) {
     log(LYRICS_TAB_NOT_DISABLED_LOG);
   }
 
-  injectLyrics(data, keepLoaderVisible);
+  injectLyrics(data, keepLoaderVisible, signal);
+}
+
+const TRAILING_ATTACHED_PUNCT_REGEX = /^[\p{Pe}\p{Pf}\p{Po}]+$/u;
+
+/**
+ * Fallback for issue #307: split a part whose core text exceeds the wrap threshold into smaller
+ * sub-parts at natural word boundaries (via Intl.Segmenter). This creates wrap opportunities for
+ * unbroken runs such as SEA-language lyrics. Duration is distributed linearly across sub-parts.
+ */
+function splitLongPart(part: LyricPart, threshold: number): LyricPart[] {
+  let segments: string[];
+  try {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+    segments = Array.from(segmenter.segment(part.words), s => s.segment);
+  } catch {
+    segments = Array.from(part.words);
+  }
+
+  // Combine punctuation with previous words
+  segments = segments.reduce((acc, curr) => {
+    if (acc.length > 0 && TRAILING_ATTACHED_PUNCT_REGEX.test(curr)) {
+      acc[acc.length - 1] += curr;
+    } else {
+      acc.push(curr);
+    }
+    return acc;
+  }, [] as string[]);
+
+  const totalChars = part.words.length;
+  const subParts: LyricPart[] = [];
+  let charsBefore = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const chunk = segments[i];
+    const subStart = part.startTimeMs + Math.round((part.durationMs * charsBefore) / totalChars);
+    const subEnd =
+      i === segments.length - 1
+        ? part.startTimeMs + part.durationMs
+        : part.startTimeMs + Math.round((part.durationMs * (charsBefore + chunk.length)) / totalChars);
+    subParts.push({
+      startTimeMs: subStart,
+      durationMs: subEnd - subStart,
+      words: chunk,
+      isBackground: part.isBackground,
+      explicit: part.explicit,
+    });
+    charsBefore += chunk.length;
+  }
+  return subParts;
 }
 
 function createLyricsLine(parts: LyricPart[], line: LineData, lyricElement: HTMLDivElement) {
@@ -154,51 +242,117 @@ function createLyricsLine(parts: LyricPart[], line: LineData, lyricElement: HTML
   let isAllRtl = true;
 
   let lyricElementsBuffer = [] as HTMLSpanElement[];
+  let lastEmittedSpan: HTMLSpanElement | null = null;
+  const wrapThreshold = longWordWrapThreshold.getNumberValue();
 
-  parts.forEach(part => {
-    let isRtl = testRtl(part.words);
-    if (!isRtl && part.words.trim().length > 0) {
-      isAllRtl = false;
-      rtlBuffer.reverse().forEach(part => {
-        lyricElementsBuffer.push(part);
+  parts = parts.flatMap(original => {
+    const parts = original.words.match(/^(\s*)([\s\S]*?)(\s*)$/u);
+    let returnArray: LyricPart[] = [];
+    if (parts && parts.length > 0) {
+      const beginWhitespace = parts[1];
+      const core = parts[2];
+      const endWhitespace = parts[3];
+      if (core.length === 0) {
+        return [original];
+      }
+
+      if (beginWhitespace.length > 0) {
+        returnArray.push({
+          startTimeMs: original.startTimeMs,
+          words: beginWhitespace,
+          durationMs: 0,
+          explicit: original.explicit,
+          isBackground: original.isBackground,
+        });
+      }
+      returnArray.push({
+        startTimeMs: original.startTimeMs,
+        words: core,
+        durationMs: original.durationMs,
+        explicit: original.explicit,
+        isBackground: original.isBackground,
       });
-      rtlBuffer = [];
+      if (endWhitespace.length > 0) {
+        returnArray.push({
+          startTimeMs: original.startTimeMs + original.durationMs,
+          words: endWhitespace,
+          durationMs: 0,
+          explicit: original.explicit,
+          isBackground: original.isBackground,
+        });
+      }
+    }
+    return returnArray;
+  });
+
+  parts.forEach(originalPart => {
+    if (originalPart.words.trim().length === 0) {
+      if (lastEmittedSpan) {
+        lastEmittedSpan.classList.add(HAS_TRAILING_SPACE_CLASS);
+      }
+      return;
     }
 
-    let span = document.createElement("span");
-    span.classList.add(WORD_CLASS);
-    if (part.durationMs === 0) {
-      span.classList.add(ZERO_DURATION_ANIMATION_CLASS);
-    }
-    if (isRtl) {
-      span.classList.add(RTL_CLASS);
-    }
+    const subParts = splitLongPart(originalPart, wrapThreshold);
 
-    let partData: PartData = {
-      time: part.startTimeMs / 1000,
-      duration: part.durationMs / 1000,
-      lyricElement: span,
-      animationStartTimeMs: Infinity,
-    };
+    subParts.forEach((part, subIdx) => {
+      const isLastSub = subIdx === subParts.length - 1;
+      let isRtl = testRtl(part.words);
+      if (!isRtl && part.words.trim().length > 0) {
+        isAllRtl = false;
+        rtlBuffer.reverse().forEach(p => {
+          lyricElementsBuffer.push(p);
+        });
+        rtlBuffer = [];
+      }
 
-    span.textContent = part.words;
-    span.dataset.time = String(partData.time);
-    span.dataset.duration = String(partData.duration);
-    span.dataset.content = part.words;
-    span.style.setProperty("--blyrics-duration", part.durationMs + "ms");
-    if (part.isBackground) {
-      span.classList.add(BACKGROUND_LYRIC_CLASS);
-    }
-    if (part.words.trim().length === 0) {
-      span.style.display = "inline";
-    }
+      let span = document.createElement("span");
+      span.classList.add(WORD_CLASS);
+      if (part.durationMs === 0) {
+        span.classList.add(ZERO_DURATION_ANIMATION_CLASS);
+      }
+      if (isRtl) {
+        span.classList.add(RTL_CLASS);
+      }
 
-    line.parts.push(partData);
-    if (isRtl) {
-      rtlBuffer.push(span);
-    } else {
-      lyricElementsBuffer.push(span);
-    }
+      let partData: PartData = {
+        time: part.startTimeMs / 1000,
+        duration: part.durationMs / 1000,
+        lyricElement: span,
+        animationStartTimeMs: Infinity,
+      };
+
+      span.textContent = part.words;
+      span.dataset.time = String(partData.time);
+      span.dataset.duration = String(partData.duration);
+      span.dataset.content = part.words;
+      span.style.setProperty("--blyrics-duration", part.durationMs + "ms");
+      if (part.durationMs > longWordThreshold.getNumberValue()) {
+        span.dataset.longWord = "true";
+      }
+      if (part.isBackground) {
+        span.classList.add(BACKGROUND_LYRIC_CLASS);
+      }
+      if (part.explicit) {
+        span.classList.add(EXPLICIT_WORD_CLASS);
+      }
+
+      // Non-final sub-parts signal a group-flush (wrap opportunity) without a trailing-space
+      // visual gap — the original text was contiguous.
+      if (!isLastSub) {
+        span.dataset.wrapAfter = "true";
+      }
+
+      line.parts.push(partData);
+
+      if (isRtl) {
+        rtlBuffer.push(span);
+      } else {
+        lyricElementsBuffer.push(span);
+      }
+
+      lastEmittedSpan = span;
+    });
   });
 
   //Add remaining rtl elements
@@ -216,7 +370,7 @@ function createLyricsLine(parts: LyricPart[], line: LineData, lyricElement: HTML
   groupByWordAndInsert(lyricElement, lyricElementsBuffer);
 }
 
-function createBreakElem(lyricElement: HTMLDivElement, order: number) {
+function createBreakElem(lyricElement: HTMLElement, order: number) {
   let breakElm: HTMLSpanElement = document.createElement("span");
   breakElm.classList.add("blyrics--break");
   breakElm.style.order = String(order);
@@ -229,59 +383,43 @@ function createBreakElem(lyricElement: HTMLDivElement, order: number) {
  *
  * @param data - Complete lyrics data object
  * @param keepLoaderVisible
+ * @param signal - AbortSignal to cancel async operations
  * @param data.lyrics - Array of lyric lines with timing
  * @param [data.source] - Source attribution for lyrics
  * @param [data.sourceHref] - URL for source link
  */
-export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false): void {
+function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible = false, signal?: AbortSignal): void {
+  const injectionId = AppState.currentInjectionId;
+  const isStale = () => AppState.currentInjectionId !== injectionId;
+
   const lyrics = data.lyrics!;
   cleanup();
-  resizeObserver.disconnect();
 
   let lyricsWrapper = createLyricsWrapper();
 
-  lyricsWrapper.innerHTML = "";
+  lyricsWrapper.replaceChildren();
   const lyricsContainer = document.createElement("div");
   lyricsContainer.className = LYRICS_CLASS;
   lyricsWrapper.appendChild(lyricsContainer);
 
   lyricsWrapper.removeAttribute("is-empty");
 
-  onTranslationEnabled(items => {
-    log(TRANSLATION_ENABLED_LOG, items.translationLanguage);
-  });
+  if (AppState.isTranslateEnabled) {
+    log(TRANSLATION_ENABLED_LOG, AppState.translationLanguage);
+  }
 
   const allZero = lyrics.every(item => item.startTimeMs === 0);
 
   if (keepLoaderVisible) {
     renderLoader(true);
   } else {
-    flushLoader(allZero && lyrics[0].words !== NO_LYRICS_TEXT);
+    flushLoader(allZero && lyrics[0].words !== t("lyrics_notFound"));
   }
-
-  const langPromise = new Promise<string>(async resolve => {
-    if (!data.language) {
-      let text = "";
-      let lineCount = 0;
-      for (let item of lyrics) {
-        text += item.words.trim() + "\n";
-        lineCount++;
-        if (lineCount >= 10) {
-          break;
-        }
-      }
-      const translationResult = await translateText(text, "en");
-      const lang = translationResult?.originalLanguage || "";
-      log(LOG_PREFIX, "Lang was missing. Determined it is: " + lang);
-      return resolve(lang);
-    } else {
-      resolve(data.language);
-    }
-  });
 
   let lines: LineData[] = [];
   let syncType: SyncType = allZero ? "none" : "synced";
 
+  // Pre-process all lines and add to DOM
   lyrics.forEach((lyricItem, lineIndex) => {
     if (lyricItem.isInstrumental) {
       const instrumentalElement = createInstrumentalElement(lyricItem.durationMs, lineIndex);
@@ -294,6 +432,10 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
       const agent = findNearestAgent(lyrics, lineIndex);
       if (agent) {
         instrumentalElement.dataset.agent = agent;
+      }
+
+      if (isNearestLyricRtl(lyrics, lineIndex)) {
+        instrumentalElement.classList.add(RTL_CLASS);
       }
 
       if (!allZero) {
@@ -315,17 +457,14 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
         isAnimationPlayStatePlaying: false,
         accumulatedOffsetMs: 0,
         isAnimating: false,
+        lastAnimSetupAt: 0,
         isSelected: false,
         height: -1,
         position: -1,
       };
 
-      try {
-        lines.push(line);
-        lyricsContainer.appendChild(instrumentalElement);
-      } catch (_err) {
-        log(LYRICS_WRAPPER_NOT_VISIBLE_LOG);
-      }
+      lines.push(line);
+      lyricsContainer.appendChild(instrumentalElement);
       return;
     }
 
@@ -340,10 +479,15 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
       const words = item.words.split(" ");
 
       words.forEach((word, index) => {
-        word = word.trim().length < 1 ? word : word + " ";
+        word = word.trim().length < 1 ? word : word;
         item.parts.push({
           startTimeMs: item.startTimeMs + index * lineSyncedAnimationDelay.getNumberValue(),
           words: word,
+          durationMs: 0,
+        });
+        item.parts.push({
+          startTimeMs: item.startTimeMs + index * lineSyncedAnimationDelay.getNumberValue(),
+          words: " ",
           durationMs: 0,
         });
       });
@@ -366,14 +510,13 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
       isAnimationPlayStatePlaying: false,
       accumulatedOffsetMs: 0,
       isAnimating: false,
+      lastAnimSetupAt: 0,
       isSelected: false,
-      height: -1, // Temp value; set later
-      position: -1, // Temp value; set later
+      height: -1,
+      position: -1,
     };
 
     createLyricsLine(item.parts, line, lyricElement);
-
-    //Makes bg lyrics go to the next line
     createBreakElem(lyricElement, 1);
 
     lyricElement.dataset.time = String(line.time);
@@ -410,10 +553,7 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
               });
             }
 
-            if (!wordElement) {
-              return;
-            }
-
+            if (!wordElement) return;
             seekTime = parseFloat(wordElement.dataset.time || "0");
           } else {
             seekTime = parseFloat(lyricElement.dataset.time || "0");
@@ -430,121 +570,12 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
       lyricElement.style.cursor = "unset";
     }
 
-    let createRomanizedElem = () => {
-      createBreakElem(lyricElement, 4);
-      let romanizedLine = document.createElement("div");
-      romanizedLine.classList.add(ROMANIZED_LYRICS_CLASS);
-      romanizedLine.style.order = "5";
-      lyricElement.appendChild(romanizedLine);
-      return romanizedLine;
-    };
-
-    let romanizedCacheResult = getRomanizationFromCache(item.words);
-
-    // Language should always exist if item.timedRomanization exists
-    const shouldRomanize =
-      (data.language && romanizationLanguages.includes(data.language)) || containsNonLatin(item.words);
-    const canInjectRomanizationsEarly = (shouldRomanize && item.romanization) || romanizedCacheResult !== null;
-    if (item.romanization) {
-      romanizedCacheResult = item.romanization;
-    }
-
-    if (canInjectRomanizationsEarly && AppState.isRomanizationEnabled) {
-      if (romanizedCacheResult !== item.words) {
-        if (item.timedRomanization && item.timedRomanization.length > 0 && !disableRichsync.getBooleanValue()) {
-          createLyricsLine(item.timedRomanization, line, createRomanizedElem());
-        } else {
-          createRomanizedElem().textContent = "\n" + romanizedCacheResult;
-        }
-      }
-    } else {
-      langPromise.then(source_language => {
-        onRomanizationEnabled(async () => {
-          let isNonLatin = containsNonLatin(item.words);
-          if (romanizationLanguages.includes(source_language) || isNonLatin) {
-            let usableLang = source_language;
-            if (isNonLatin && !romanizationLanguages.includes(source_language)) {
-              usableLang = "auto";
-            }
-
-            if (item.words.trim() !== "♪" && item.words.trim() !== "") {
-              let result;
-              if (item.romanization) {
-                result = item.romanization;
-              } else {
-                result = await translateTextIntoRomaji(usableLang, item.words);
-              }
-
-              if (result && !isSameText(result, item.words)) {
-                createRomanizedElem().textContent = result;
-                lyricsElementAdded();
-              }
-            }
-          }
-        });
-      });
-    }
-
-    let createTranslationElem = () => {
-      createBreakElem(lyricElement, 6);
-      let translatedLine = document.createElement("div");
-      translatedLine.classList.add(TRANSLATED_LYRICS_CLASS);
-      translatedLine.style.order = "7";
-      lyricElement.appendChild(translatedLine);
-      return translatedLine;
-    };
-
-    let translationResult: TranslationResult | null;
-
-    let targetTranslationLang = AppState.translationLanguage;
-
-    if (item.translation && langCodesMatch(targetTranslationLang, item.translation.lang)) {
-      translationResult = {
-        originalLanguage: item.translation.lang,
-        translatedText: item.translation.text,
-      };
-    } else {
-      translationResult = getTranslationFromCache(item.words, targetTranslationLang);
-    }
-
-    if (translationResult && AppState.isTranslateEnabled) {
-      if (!isSameText(translationResult.translatedText, item.words)) {
-        createTranslationElem().textContent = "\n" + translationResult.translatedText;
-      }
-    } else {
-      langPromise.then(source_language => {
-        onTranslationEnabled(async items => {
-          let target_language = items.translationLanguage || "en";
-
-          if (source_language !== target_language || containsNonLatin(item.words)) {
-            if (item.words.trim() !== "♪" && item.words.trim() !== "") {
-              let result;
-              if (item.translation && target_language === item.translation.lang) {
-                result = {
-                  originalLanguage: item.translation.lang,
-                  translatedText: item.translation.text,
-                };
-              } else {
-                result = await translateText(item.words, target_language);
-              }
-
-              if (result && !isSameText(result.translatedText, item.words)) {
-                createTranslationElem().textContent = "\n" + result.translatedText;
-                lyricsElementAdded();
-              }
-            }
-          }
-        });
-      });
-    }
-
-    try {
-      lines.push(line);
-      lyricsContainer.appendChild(lyricElement);
-    } catch (_err) {
-      log(LYRICS_WRAPPER_NOT_VISIBLE_LOG);
-    }
+    lines.push(line);
+    lyricsContainer.appendChild(lyricElement);
   });
+
+  // Handle Translations and Romanizations in Batch
+  processBatchTranslationsAndRomanizations(data, lines, isStale, signal);
 
   animEngineState.skipScrolls = 2;
   animEngineState.skipScrollsDecayTimes = [];
@@ -553,25 +584,32 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
   }
   animEngineState.scrollResumeTime = 0;
 
-  if (lyrics[0].words !== NO_LYRICS_TEXT) {
-    addFooter(data.source, data.sourceHref, data.song, data.artist, data.album, data.duration, data.providerKey);
+  if (lyrics[0].words !== t("lyrics_notFound")) {
+    const unisonData =
+      data.source === "Unison" && "unisonData" in data ? (data as { unisonData: UnisonData }).unisonData : undefined;
+    addFooter(
+      data.source,
+      data.sourceHref,
+      data.song,
+      data.artist,
+      data.album,
+      data.duration,
+      data.providerKey,
+      data.videoId,
+      unisonData,
+      syncType === "none"
+    );
   } else {
-    addNoLyricsButton(data.song, data.artist, data.album, data.duration);
+    addNoLyricsButton(data.song, data.artist, data.album, data.duration, data.videoId);
   }
-
-  let spacingElement = document.createElement("div");
-  spacingElement.id = LYRICS_SPACING_ELEMENT_ID;
-  spacingElement.style.height = "100px"; // Temp Value; actual is calculated in the tick function
-  spacingElement.textContent = "";
-  spacingElement.style.padding = "0";
-  spacingElement.style.margin = "0";
-  lyricsContainer.appendChild(spacingElement);
 
   lyricsContainer.dataset.sync = syncType;
   lyricsContainer.dataset.loaderVisible = String(keepLoaderVisible);
-  if (lyrics[0].words === NO_LYRICS_TEXT) {
+  if (lyrics[0].words === t("lyrics_notFound")) {
     lyricsContainer.dataset.noLyrics = "true";
   }
+
+  const tabSelector = document.getElementsByClassName(TAB_HEADER_CLASS)[1] as HTMLElement;
 
   let lyricsData = {
     lines: lines,
@@ -579,6 +617,8 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
     lyricWidth: lyricsContainer.clientWidth,
     lyricHeight: lyricsContainer.clientHeight,
     isMusicVideoSynced: data.musicVideoSynced === true,
+    tabSelector,
+    lyricsContainer,
   };
 
   if (data.segmentMap) {
@@ -587,30 +627,195 @@ export function injectLyrics(data: LyricSourceResultWithMeta, keepLoaderVisible 
 
   AppState.lyricData = lyricsData;
 
-  if (!allZero) {
-    AppState.areLyricsTicking = true;
-    calculateLyricPositions();
-    resizeObserver.observe(lyricsWrapper);
-  } else {
+  AppState.areLyricsTicking = true;
+  calculateLyricPositions();
+  getResizeObserver().observe(lyricsWrapper);
+  if (allZero) {
     log(SYNC_DISABLED_LOG);
   }
 
   AppState.areLyricsLoaded = true;
 }
 
-export function calculateLyricPositions() {
-  if (AppState.lyricData && AppState.areLyricsTicking) {
-    const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
+/**
+ * Handles batch translation and romanization processing.
+ */
+async function processBatchTranslationsAndRomanizations(
+  data: LyricSourceResultWithMeta,
+  linesData: LineData[],
+  isStale: () => boolean,
+  signal?: AbortSignal
+): Promise<void> {
+  const lyrics = data.lyrics!;
+  const targetTranslationLang = AppState.translationLanguage;
+  const isRomanizationEnabled = AppState.isRomanizationEnabled;
+  const isTranslateEnabled = AppState.isTranslateEnabled;
 
-    if (ADD_EXTRA_PADDING_TOP.getBooleanValue()) {
-      const tabRendererHeight = document.getElementById("tab-renderer")?.clientHeight;
-      if (tabRendererHeight) {
-        lyricsElement.style.paddingTop = `${tabRendererHeight * SCROLL_POS_OFFSET_RATIO.getNumberValue()}px`;
+  const romanizationBatch: { index: number; text: string }[] = [];
+  const translationBatch: { index: number; text: string }[] = [];
+
+  let sourceLanguage = data.language;
+
+  // 1. Identify what needs to be translated/romanized
+  lyrics.forEach((item, index) => {
+    if (item.isInstrumental) return;
+
+    const lineData = linesData[index];
+    const lyricElement = lineData.lyricElement;
+
+    // --- Romanization ---
+    const isLanguageDisabledForRomanization = sourceLanguage && isRomanizationDisabledForLang(sourceLanguage);
+    if (isRomanizationEnabled && !isLanguageDisabledForRomanization) {
+      let romanizedResult: string | null = null;
+      let timedRomanization: LyricPart[] | null = null;
+
+      if (item.romanization) {
+        romanizedResult = item.romanization;
+        timedRomanization = item.timedRomanization || null;
       } else {
-        lyricsElement.style.paddingTop = "";
-        log("Could not find tab renderer height, not adding extra padding top.");
+        romanizedResult = getRomanizationFromCache(item.words);
+      }
+
+      if (romanizedResult && !isSameText(romanizedResult, item.words)) {
+        injectRomanization(lyricElement, lineData, romanizedResult, timedRomanization);
+      } else {
+        const shouldRomanize =
+          (sourceLanguage && languageMatchesAny(sourceLanguage, ROMANIZATION_LANGUAGES)) ||
+          containsNonLatin(item.words);
+        if (shouldRomanize || !sourceLanguage) {
+          const detectedLang = detectNonLatinLanguage(item.words);
+          if (!detectedLang || !isRomanizationDisabledForLang(detectedLang)) {
+            romanizationBatch.push({ index, text: item.words });
+          }
+        }
       }
     }
+
+    // --- Translation ---
+    const isSourceLangDisabled = !!sourceLanguage && isTranslationDisabledForLang(sourceLanguage);
+
+    if (isTranslateEnabled && !isSourceLangDisabled) {
+      let translationResult: string | null = null;
+
+      const matchedLang =
+        item.translations && Object.keys(item.translations).find(lang => langCodesMatch(targetTranslationLang, lang));
+      if (item.translations && matchedLang) {
+        translationResult = item.translations[matchedLang];
+      } else if (item.translation && langCodesMatch(targetTranslationLang, item.translation.lang)) {
+        translationResult = item.translation.text;
+      } else {
+        const cached = getTranslationFromCache(item.words, targetTranslationLang);
+        translationResult = cached?.translatedText || null;
+      }
+
+      if (translationResult && !isSameText(translationResult, item.words)) {
+        injectTranslation(lyricElement, translationResult);
+      } else if (sourceLanguage !== targetTranslationLang || containsNonLatin(item.words) || !sourceLanguage) {
+        translationBatch.push({ index, text: item.words });
+      }
+    }
+  });
+
+  if (isStale()) return;
+
+  // 2. Perform Batch Requests
+  const promises: Promise<void>[] = [];
+
+  if (romanizationBatch.length > 0) {
+    promises.push(
+      (async () => {
+        const response = await romanizeBatch({
+          lines: romanizationBatch.map(b => b.text),
+          sourceLanguage: sourceLanguage || "auto",
+          signal,
+        });
+        if (isStale()) return;
+
+        if (!sourceLanguage && response.detectedLanguage) {
+          sourceLanguage = response.detectedLanguage;
+          log(LOG_PREFIX, "Determined language via romanization batch: " + sourceLanguage);
+        }
+
+        if (isRomanizationDisabledForLang(sourceLanguage || "")) return;
+
+        response.results.forEach((result, i) => {
+          if (result) {
+            const originalIndex = romanizationBatch[i].index;
+            injectRomanization(linesData[originalIndex].lyricElement, linesData[originalIndex], result);
+          }
+        });
+        lyricsElementAdded();
+      })()
+    );
+  }
+
+  if (translationBatch.length > 0) {
+    promises.push(
+      (async () => {
+        const response = await translateBatch({
+          lines: translationBatch.map(b => b.text),
+          targetLanguage: targetTranslationLang,
+          signal,
+        });
+        if (isStale()) return;
+
+        if (!sourceLanguage && response.detectedLanguage) {
+          sourceLanguage = response.detectedLanguage;
+          log(LOG_PREFIX, "Determined language via translation batch: " + sourceLanguage);
+        }
+
+        if (isTranslationDisabledForLang(sourceLanguage || "")) return;
+
+        response.results.forEach((result, i) => {
+          if (result) {
+            const originalIndex = translationBatch[i].index;
+            injectTranslation(linesData[originalIndex].lyricElement, result.translatedText);
+          }
+        });
+        lyricsElementAdded();
+      })()
+    );
+  }
+
+  await Promise.all(promises);
+}
+
+function injectRomanization(
+  lyricElement: HTMLElement,
+  lineData: LineData,
+  text: string,
+  timedRomanization: LyricPart[] | null = null
+) {
+  if (lyricElement.querySelector(`.${ROMANIZED_LYRICS_CLASS}`)) return;
+
+  createBreakElem(lyricElement, 4);
+  const romanizedLine = document.createElement("div");
+  romanizedLine.classList.add(ROMANIZED_LYRICS_CLASS);
+  romanizedLine.style.order = "5";
+
+  if (timedRomanization && timedRomanization.length > 0 && !disableRichsync.getBooleanValue()) {
+    createLyricsLine(timedRomanization, lineData, romanizedLine);
+  } else {
+    romanizedLine.textContent = text;
+  }
+  lyricElement.appendChild(romanizedLine);
+}
+
+function injectTranslation(lyricElement: HTMLElement, text: string) {
+  if (lyricElement.querySelector(`.${TRANSLATED_LYRICS_CLASS}`)) return;
+
+  createBreakElem(lyricElement, 6);
+  const translatedLine = document.createElement("div");
+  translatedLine.classList.add(TRANSLATED_LYRICS_CLASS);
+  translatedLine.style.order = "7";
+  translatedLine.textContent = text;
+  lyricElement.appendChild(translatedLine);
+}
+
+export function calculateLyricPositions() {
+  setExtraHeight();
+  if (AppState.lyricData && AppState.areLyricsTicking) {
+    const lyricsElement = document.getElementsByClassName(LYRICS_CLASS)[0] as HTMLElement;
 
     const data = AppState.lyricData;
     data.lyricWidth = lyricsElement.clientWidth;
@@ -631,7 +836,6 @@ export function calculateLyricPositions() {
  * @param lyricElementsBuffer elements to add
  */
 function groupByWordAndInsert(lyricElement: HTMLDivElement, lyricElementsBuffer: HTMLSpanElement[]) {
-  const breakChar = /([\s\u200B\u00AD\p{Dash_Punctuation}])/gu;
   let wordGroupBuffer = [] as HTMLSpanElement[];
   let isCurrentBufferBg = false;
 
@@ -652,31 +856,22 @@ function groupByWordAndInsert(lyricElement: HTMLDivElement, lyricElementsBuffer:
   };
 
   lyricElementsBuffer.forEach(part => {
-    const isNonMatchingType = isCurrentBufferBg !== part.classList.contains(BACKGROUND_LYRIC_CLASS);
+    const partIsBg = part.classList.contains(BACKGROUND_LYRIC_CLASS);
+    const isNonMatchingType = isCurrentBufferBg !== partIsBg;
+    const hasTrailingSpace = part.classList.contains(HAS_TRAILING_SPACE_CLASS);
+    const wrapAfter = part.dataset.wrapAfter === "true";
 
-    const isElmJustSpace = !(part.textContent.length === 1 && part.textContent[0] === " ");
-    if (!isNonMatchingType) {
-      wordGroupBuffer.push(part);
-    }
-    if (
-      (part.textContent.length > 0 && breakChar.test(part.textContent[part.textContent.length - 1])) ||
-      isNonMatchingType
-    ) {
+    if (isNonMatchingType) {
       pushWordGroupBuffer();
+      isCurrentBufferBg = partIsBg;
     }
+    wordGroupBuffer.push(part);
 
-    // Switch to the correct type unless the current char we're at is just a space.
-    //
-    // We do this to prevent phantom spaces
-    // from appearing at the beginning of the word when the bg lyrics are at the start of a line
-
-    if (isNonMatchingType && isElmJustSpace) {
-      wordGroupBuffer.push(part);
-      isCurrentBufferBg = part.classList.contains(BACKGROUND_LYRIC_CLASS);
+    if (hasTrailingSpace || wrapAfter) {
+      pushWordGroupBuffer();
     }
   });
 
-  //add remaining
   pushWordGroupBuffer();
 }
 
@@ -696,13 +891,4 @@ function isSameText(str1: string, str2: string): boolean {
     .trim();
 
   return str1 === str2;
-}
-
-/**
- * Compare base language codes, e.g. "en" matches "en-US"
- */
-function langCodesMatch(lang1: string, lang2: string): boolean {
-  const base1 = lang1.split("-")[0];
-  const base2 = lang2.split("-")[0];
-  return base1 === base2;
 }
